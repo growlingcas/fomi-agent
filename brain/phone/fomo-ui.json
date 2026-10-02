@@ -1,0 +1,102 @@
+{
+  "_readme": "Карта интерфейса приложения fomo. deepLink — сначала пробуем открыть токен прямо по ссылке fomo.family (если приложение перехватывает такие ссылки); не вышло — идём через поиск. Каждый шаг ищется по text / textContains / desc / id, а если не найден — по xy (доли экрана 0..1). Заполняется после `npm run phone:snap`.",
+  "package": "TODO.fomo.package.name",
+  "deepLink": "https://fomo.family/tokens/solana/{CA}",
+  "steps": {
+    "home": {
+      "desc": "Home",
+      "xy": [
+        0.1,
+        0.95
+      ]
+    },
+    "openSearch": {
+      "desc": "Search",
+      "xy": [
+        0.3,
+        0.95
+      ]
+    },
+    "searchInput": {
+      "textContains": "Search",
+      "xy": [
+        0.5,
+        0.08
+      ]
+    },
+    "firstResult": {
+      "xy": [
+        0.5,
+        0.2
+      ]
+    },
+    "buyButton": {
+      "text": "Buy",
+      "xy": [
+        0.3,
+        0.92
+      ]
+    },
+    "amountInput": {
+      "textContains": "SOL",
+      "xy": [
+        0.5,
+        0.4
+      ]
+    },
+    "confirmBuy": {
+      "text": "Confirm",
+      "xy": [
+        0.5,
+        0.9
+      ]
+    },
+    "sellButton": {
+      "text": "Sell",
+      "xy": [
+        0.7,
+        0.92
+      ]
+    },
+    "sell50": {
+      "text": "50%",
+      "xy": [
+        0.5,
+        0.55
+      ]
+    },
+    "sell100": {
+      "text": "100%",
+      "xy": [
+        0.8,
+        0.55
+      ]
+    },
+    "confirmSell": {
+      "text": "Confirm",
+      "xy": [
+        0.5,
+        0.9
+      ]
+    },
+    "thesisInput": {
+      "textContains": "thesis",
+      "xy": [
+        0.5,
+        0.3
+      ]
+    },
+    "postThesis": {
+      "text": "Post",
+      "xy": [
+        0.85,
+        0.07
+      ]
+    }
+  },
+  "checks": {
+    "confirmScreenMustContain": [
+      "{SYMBOL}"
+    ]
+  }
+}

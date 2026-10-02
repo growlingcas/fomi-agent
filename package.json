@@ -1,0 +1,34 @@
+{
+  "name": "fomi-agent",
+  "version": "0.1.0",
+  "description": "FOMI \u2014 open-source AI trading agent for fomo. Her brain, her bank, her trades \u2014 all public.",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "brain": "node brain/index.js",
+    "tick": "node brain/index.js --once",
+    "mock": "MOCK=1 node brain/index.js --once",
+    "status": "node brain/cli.js status",
+    "confirm": "node brain/cli.js confirm",
+    "resume": "node brain/cli.js resume",
+    "reset": "node brain/cli.js reset",
+    "site": "npx --yes serve docs -l 4173",
+    "live": "node brain/live/server.js",
+    "phone:snap": "node brain/cli.js phone-snap",
+    "phone:test": "node brain/cli.js phone-test",
+    "stop": "node brain/cli.js stop",
+    "unstop": "node brain/cli.js unstop",
+    "phone:ping": "node brain/cli.js phone-ping",
+    "gmgn:keys": "gmgn-cli config",
+    "gmgn:check": "gmgn-cli market trending --chain sol --interval 1h --limit 3"
+  },
+  "optionalDependencies": {
+    "sharp": "^0.33.0"
+  },
+  "dependencies": {
+    "gmgn-cli": "^1.6.6"
+  }
+}

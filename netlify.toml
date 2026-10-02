@@ -1,0 +1,5 @@
+# Netlify: сайт — папка docs, функции — netlify/functions. Сборка не нужна.
+[build]
+  publish = "docs"
+  command = ""
+  functions = "netlify/functions"

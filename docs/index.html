@@ -1,0 +1,1175 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>fomi — an ai that trades on fomo, brain open</title>
+<meta name="description" content="fomi is an autonomous ai agent trading memecoins on fomo with 5 sol. watch her screen, her brain and her bank live.">
+<meta property="og:title" content="fomi — brain open">
+<meta property="og:description" content="an ai that trades memecoins on fomo. watch her read, think and decide live.">
+<meta property="og:image" content="assets/fomi.png">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Martian+Mono:wght@300;400;600;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+  /* палитра — цвета самой fomi */
+  --void:#000;          /* экран терминала */
+  --hair:#5CF02A;       /* её мысли, мозг */
+  --lime:#B8F20A;       /* промт, ссылки, действия */
+  --pink:#F0306E;       /* деньги: входы, позиции, pnl */
+  --sky:#5FAFFF;        /* глаза: то, что она читает прямо сейчас */
+  --peach:#FFD9C0;      /* её голос: тезисы */
+  --text:#c4c6bd;
+  --dim:#6b6d66;
+  --line:#23241f;
+  --mono:"Martian Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,"Liberation Mono",monospace;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px);background:var(--void)}
+body{
+  margin:0;background:var(--void);color:var(--text);
+  font:400 13px/1.55 var(--mono);letter-spacing:-.01em;
+  background-image:radial-gradient(#161613 1px,transparent 1.2px);background-size:22px 22px;
+  -webkit-font-smoothing:antialiased;
+}
+a{color:var(--lime);text-decoration:none}
+a:hover{text-decoration:underline}
+:focus-visible{outline:2px solid var(--lime);outline-offset:2px}
+::selection{background:var(--hair);color:#000}
+
+/* ── статус-бар как в tmux ── */
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;display:flex;gap:0;flex-wrap:wrap;
+  background:var(--void);border-bottom:1px solid var(--line);font-size:11.5px}
+.bar>*{padding:7px 12px;border-right:1px solid var(--line);white-space:nowrap}
+.bar .me{background:var(--hair);color:#000;font-weight:800}
+.bar .live::before{content:"";display:inline-block;width:7px;height:7px;margin-right:7px;background:var(--pink);vertical-align:1px;animation:blink 1.1s steps(1) infinite}
+.bar .grow{flex:1;border-right:0}
+.bar .pos{color:var(--hair)} .bar .neg{color:var(--pink)}
+.bar a{color:var(--text)} .bar a.cta{background:var(--pink);color:#000;font-weight:600}
+@keyframes blink{50%{opacity:0}}
+
+.wrap{max-width:1480px;margin:0 auto;padding:22px 18px 40px}
+
+/* ── шапка ── */
+.head{display:grid;grid-template-columns:auto 1fr;gap:28px;align-items:end;margin:10px 0 26px}
+.logo{margin:0;font:800 9.5px/1.02 var(--mono);color:var(--hair);white-space:pre;letter-spacing:0}
+.logo b{color:var(--pink);font-weight:800}
+.head p{margin:0;max-width:56ch;font-size:15px;line-height:1.6;color:#e2e3dc}
+.head p span{color:var(--dim)}
+
+/* ── панели-окна ── */
+.pane{position:relative;border:1px solid var(--line);padding:18px 14px 14px;background:rgba(0,0,0,.86);min-width:0}
+.pane>h2{position:absolute;top:-9px;left:10px;margin:0;padding:0 6px;background:var(--void);font:400 11.5px/1.5 var(--mono);color:var(--dim)}
+.pane>h2 i{font-style:normal;color:var(--lime)}
+
+.grid{display:grid;grid-template-columns:270px minmax(0,1fr) 330px;gap:18px}
+.col{display:flex;flex-direction:column;gap:18px;min-width:0}
+
+/* ── левая колонка ── */
+.avatar{display:block;width:100%;aspect-ratio:1;object-fit:cover;image-rendering:pixelated;border:1px solid var(--line);background:#000}
+.whoami{margin:12px 0 0;font-size:12px;color:var(--text)}
+.whoami b{color:var(--hair);font-weight:600}
+.kv{display:grid;grid-template-columns:1fr auto;gap:3px 10px;margin:0;font-size:12px}
+.kv dt{color:var(--dim)} .kv dd{margin:0;text-align:right;color:#e6e7e0;font-variant-numeric:tabular-nums}
+.meter{margin:10px 0 12px;font-size:12px;letter-spacing:0;white-space:pre;overflow:hidden}
+.meter .f{color:var(--pink)} .meter .r{color:var(--dim)} .meter .e{color:#2a2b25}
+.big{font:600 30px/1.1 var(--mono);color:#f2f3ec;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.big small{font-size:13px;color:var(--dim);font-weight:400;margin-left:6px}
+.pos{color:var(--hair)} .neg{color:var(--pink)}
+.rules{margin:0;padding:0;list-style:none;font-size:11.5px;color:var(--dim)}
+.rules li{padding:2px 0} .rules li b{color:var(--text);font-weight:400}
+
+/* ── стрим ── */
+.stream{padding:0;border-color:#2e3029;display:flex;flex-direction:column;min-height:560px}
+.stream>h2{color:var(--text)}
+.chrome{display:flex;align-items:stretch;border-bottom:1px solid var(--line);padding-top:12px}
+.tab{padding:7px 14px;font-size:11.5px;color:var(--dim);border-right:1px solid var(--line);white-space:nowrap}
+.tab.on{color:#000;background:var(--sky)}
+.rec{margin-left:auto;padding:7px 12px;font-size:11px;color:var(--pink);white-space:nowrap}
+.rec::before{content:"● ";animation:blink 1s steps(1) infinite}
+.url{display:flex;gap:10px;padding:8px 14px;border-bottom:1px solid var(--line);font-size:12px;color:var(--dim)}
+.url span{color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.view{position:relative;flex:1;padding:14px 16px 16px;overflow:hidden;min-height:340px}
+.page-title{margin:0 0 14px;color:#e6e7e0;font-size:14px;font-weight:600}
+.ln{position:relative;white-space:pre;overflow:hidden;text-overflow:ellipsis;padding:4px 8px;margin:0 -8px;font-size:13px;color:#9c9e95;transition:color .2s;isolation:isolate}
+.ln.head{color:#45473f;font-size:11.5px;padding-bottom:6px;border-bottom:1px dashed #1f201b;margin-bottom:4px}
+.ln.in{animation:lnin .25s steps(4) both}
+@keyframes lnin{from{clip-path:inset(0 100% 0 0)}to{clip-path:inset(0 0 0 0)}}
+.ln.read{color:#000}
+.ln .sweep{position:absolute;inset:0;background:var(--sky);transform-origin:left;transform:scaleX(0);z-index:-1}
+.ln.read .sweep{transform:scaleX(1);transition:transform 1.1s steps(28)}
+.ln.seen{color:var(--sky)}
+.ln.voice{color:var(--peach);white-space:pre-wrap}
+.ln.btn{display:inline-block;margin:12px 0 0;padding:6px 14px;background:var(--pink);color:#000;font-weight:600}
+.ln.btn.pressed{background:var(--hair)}
+.cursor{position:absolute;left:0;top:0;width:18px;height:22px;z-index:5;pointer-events:none;
+  transition:transform .75s cubic-bezier(.6,.05,.2,1);will-change:transform}
+.cursor.click{animation:click .25s steps(2)}
+@keyframes click{50%{transform:var(--t) scale(.8)}}
+.caption{display:flex;gap:10px;border-top:1px solid var(--line);padding:10px 14px;font-size:12px;min-height:40px}
+.caption .who{color:var(--sky);white-space:nowrap}
+.caption .what{color:#e6e7e0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.caption .what::after{content:"▌";color:var(--sky);animation:blink .9s steps(1) infinite}
+
+/* ── правая колонка: мысли ── */
+.log{height:300px;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-end;font-size:11.5px;line-height:1.5;
+  mask-image:linear-gradient(transparent,#000 22%)}
+.log div{white-space:pre-wrap;word-break:break-word}
+.log .ts{color:#45473f}
+.log .read{color:var(--sky)} .log .think{color:var(--hair)} .log .money{color:var(--pink)} .log .voice{color:var(--peach)} .log .sys{color:var(--dim)}
+.thesis{margin:0;font-size:13.5px;line-height:1.6;color:var(--peach);min-height:5.2em;white-space:pre-wrap}
+.thesis::after{content:"▌";animation:blink .9s steps(1) infinite;color:var(--peach)}
+.thesis-meta{margin-top:8px;font-size:11px;color:var(--dim)}
+table{width:100%;border-collapse:collapse;font-size:12px;font-variant-numeric:tabular-nums}
+th{text-align:left;font-weight:400;color:var(--dim);padding:0 0 6px;border-bottom:1px solid var(--line)}
+td{padding:5px 0;border-bottom:1px dashed #1b1c18}
+td:last-child,th:last-child{text-align:right}
+.empty{color:var(--dim);font-size:12px;padding:6px 0}
+
+/* ── мозг ── */
+.brain{margin-top:26px;padding:0;display:grid;grid-template-columns:260px minmax(0,1fr) 260px;min-height:470px;border-color:#2e3029}
+.brain>h2{color:var(--text)}
+.sigs{padding:30px 16px 16px;border-right:1px solid var(--line);font-size:12px}
+.sig{display:grid;grid-template-columns:76px 1fr 34px;gap:8px;align-items:center;padding:5px 0;white-space:nowrap}
+.sig .n{color:var(--text)} .sig .v{text-align:right;color:var(--dim);font-variant-numeric:tabular-nums}
+.sig .b{letter-spacing:0;overflow:hidden}
+.sig.hot .n{color:#fff}
+.sig .w{grid-column:2/4;font-size:10.5px;color:#4a4c44;margin-top:-3px}
+.canvas-wrap{position:relative;min-width:0;min-height:440px}
+#brainCanvas{position:absolute;inset:0;display:block;width:100%;height:100%}
+.canvas-note{position:absolute;left:14px;bottom:10px;font-size:11px;color:#45473f}
+.verdict{padding:30px 16px 16px;border-left:1px solid var(--line);display:flex;flex-direction:column;gap:12px}
+.score{font:800 64px/1 var(--mono);letter-spacing:-.05em;color:#f2f3ec;font-variant-numeric:tabular-nums}
+.score small{font-size:14px;color:var(--dim);font-weight:400;letter-spacing:0}
+.thr{font-size:11.5px;color:var(--dim);white-space:pre;letter-spacing:0;overflow:hidden}
+.decision{font:800 34px/1 var(--mono);letter-spacing:-.02em;color:var(--dim)}
+.decision.enter{color:var(--pink)} .decision.skip{color:#3b3d36}
+.reasons{margin:0;padding:0;list-style:none;font-size:11.5px}
+.reasons li{padding:2px 0;color:var(--text)} .reasons li.r{color:var(--dim)}
+.by{font-size:11px;color:#45473f;margin-top:auto}
+
+/* ── низ ── */
+.lower{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) minmax(0,1fr);gap:18px;margin-top:26px}
+.weights .wl{display:grid;grid-template-columns:78px 1fr 40px;gap:8px;font-size:12px;padding:3px 0;white-space:nowrap}
+.weights .wl .b{color:var(--hair);overflow:hidden;letter-spacing:0}
+.weights .wl .v{text-align:right;color:var(--dim)}
+.lessons{margin:12px 0 0;padding:0;list-style:none;font-size:11.5px;color:var(--dim)}
+.lessons li{padding:2px 0}
+.tree{margin:0;font-size:12px;line-height:1.55;white-space:pre;overflow-x:auto;color:var(--text)}
+.tree i{font-style:normal;color:#45473f}
+.tree b{color:var(--hair);font-weight:400}
+.clone{display:block;margin-top:12px;padding:9px 12px;border:1px solid var(--line);font-size:12px;color:var(--text);white-space:nowrap;overflow-x:auto}
+.clone::before{content:"$ ";color:var(--lime)}
+.gh{display:inline-block;margin-top:12px;padding:8px 14px;background:var(--hair);color:#000;font-weight:600}
+.gh:hover{text-decoration:none;background:var(--lime)}
+.steps{margin:0;padding:0;list-style:none;counter-reset:s;font-size:12px}
+.steps{columns:2 420px;column-gap:40px}
+.steps li{counter-increment:s;position:relative;padding:4px 0 4px 24px;color:var(--text);break-inside:avoid}
+.steps li::before{content:counter(s);position:absolute;left:0;color:var(--pink)}
+.steps li span{color:var(--dim)}
+footer{margin-top:34px;padding-top:16px;border-top:1px solid var(--line);font-size:11.5px;color:var(--dim);display:flex;gap:24px;flex-wrap:wrap;justify-content:space-between}
+footer p{margin:0;max-width:80ch}
+
+/* ── загрузка ── */
+.boot{position:fixed;inset:0;z-index:50;background:#000;padding:max(28px,env(safe-area-inset-top,0px)) 28px 28px;font-size:13px;color:var(--hair);white-space:pre-wrap;overflow:hidden;cursor:pointer}
+.boot .d{color:var(--dim)} .boot .p{color:var(--pink)}
+.boot.gone{opacity:0;visibility:hidden;transition:opacity .35s steps(5),visibility 0s .35s}
+
+/* ── адаптив ── */
+@media (max-width:1180px){
+  .grid{grid-template-columns:minmax(0,1fr) 300px}
+  .grid .left{grid-column:1/-1;display:grid;grid-template-columns:200px 1fr 1fr;gap:18px}
+  .grid .left .pane:first-child{grid-row:span 1}
+  .stream{grid-row:2}
+  .grid .right{grid-row:2}
+  .lower{grid-template-columns:1fr 1fr}
+  .lower>:first-child{grid-column:1/-1}
+}
+@media (max-width:820px){
+  .grid{grid-template-columns:minmax(0,1fr)}
+  .grid .left{grid-template-columns:1fr}
+  .stream,.grid .right{grid-row:auto}
+  .stream{min-height:440px}
+  .ln{font-size:11.5px}
+  .bar .grow{display:none}
+  .brain{grid-template-columns:1fr}
+  .sigs{border-right:0;border-bottom:1px solid var(--line)}
+  .verdict{border-left:0;border-top:1px solid var(--line)}
+  .canvas-wrap{min-height:340px}
+  .lower{grid-template-columns:1fr}
+  .head{grid-template-columns:1fr;gap:16px}
+  .logo{font-size:7px}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important}
+}
+
+/* ── шапка с лицом ── */
+.head{grid-template-columns:auto auto 1fr;align-items:center}
+.face{width:104px;height:104px;object-fit:cover;object-position:50% 30%;image-rendering:pixelated;border:1px solid var(--line);background:#000}
+
+/* ── два экрана ── */
+.hero{display:grid;grid-template-columns:340px minmax(0,1fr) 320px;gap:18px;align-items:stretch}
+.info{display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;margin-top:26px}
+.phone-pane{display:flex;flex-direction:column;padding:0;border-color:#2e3029}
+.phone-pane>h2{color:var(--text)}
+.phone-status{display:flex;justify-content:space-between;padding:14px 14px 0;font-size:11px;color:var(--dim)}
+.phone-status #phoneSrc::before{content:"■ ";color:var(--dim)}
+.phone-status.on #phoneSrc{color:var(--hair)} .phone-status.on #phoneSrc::before{color:var(--hair)}
+.phone{margin:12px auto 14px;width:min(100%,270px);aspect-ratio:9/19;border:2px solid #34362f;border-radius:26px;padding:12px 8px 16px;background:#050505;position:relative}
+.phone::before{content:"";position:absolute;top:5px;left:50%;width:46px;height:4px;margin-left:-23px;background:#1c1d19;border-radius:2px}
+.phone-screen{position:relative;width:100%;height:100%;overflow:hidden;border-radius:14px;background:#0a0a0a}
+#phoneImg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.taps{position:absolute;inset:0;pointer-events:none}
+.tapdot{position:absolute;width:34px;height:34px;margin:-17px 0 0 -17px;border:2px solid var(--sky);border-radius:50%;animation:tap .7s ease-out forwards}
+.tapdot::after{content:"";position:absolute;left:50%;top:50%;width:8px;height:8px;margin:-4px;background:var(--sky);border-radius:50%}
+@keyframes tap{from{transform:scale(.4);opacity:1}to{transform:scale(1.5);opacity:0}}
+
+/* ── демо-приложение на телефоне (условный интерфейс, не копия fomo) ── */
+.app{position:absolute;inset:0;display:flex;flex-direction:column;font-size:10.5px;line-height:1.45;color:#d9dad3}
+.app .top{display:flex;justify-content:space-between;align-items:center;padding:10px 12px 8px;border-bottom:1px solid #1d1e1a;font-weight:600}
+.app .top small{color:var(--dim);font-weight:400}
+.app .body{flex:1;overflow:hidden;padding:8px 12px;position:relative}
+.app .post{padding:7px 0;border-bottom:1px solid #161713}
+.app .post b{color:#fff;font-weight:600} .app .post .tk{color:var(--lime)} .app .post .amt{color:var(--pink)}
+.app .nav{display:flex;justify-content:space-around;border-top:1px solid #1d1e1a;padding:9px 0 10px;color:var(--dim)}
+.app .nav .on{color:#fff}
+.app .field{border:1px solid #2a2b25;padding:7px 9px;margin:4px 0 10px;color:#fff;min-height:30px;word-break:break-all}
+.app .field.focus{border-color:var(--sky)}
+.app .res{padding:8px;border:1px solid #2a2b25;margin-top:4px}
+.app .tkname{font:800 22px/1.1 var(--mono);color:#fff;letter-spacing:-.02em}
+.app .price{color:var(--dim);margin:2px 0 8px}
+.app .spark{color:var(--hair);letter-spacing:0;white-space:pre;font-size:12px;line-height:1;margin:6px 0 10px;overflow:hidden}
+.app .row2{display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;color:var(--dim)} .app .row2 b{color:#e6e7e0;font-weight:400}
+.app .btns{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:10px 12px 12px}
+.app .btn{padding:10px 0;text-align:center;font-weight:600;color:#000;background:var(--hair)}
+.app .btn.sell{background:#2a2b25;color:#e6e7e0}
+.app .btn.pink{background:var(--pink)}
+.app .btn.full{grid-column:1/-1}
+.app .chips{display:flex;gap:6px;margin-bottom:12px} .app .chip{flex:1;text-align:center;padding:6px 0;border:1px solid #2a2b25;color:var(--dim)} .app .chip.on{border-color:var(--pink);color:var(--pink)}
+.app .sheet{position:absolute;left:0;right:0;bottom:0;background:#101110;border-top:1px solid #2a2b25;padding:12px 12px 0;animation:up .25s steps(5)}
+@keyframes up{from{transform:translateY(100%)}to{transform:none}}
+.app .toast{position:absolute;left:12px;right:12px;top:44px;padding:9px 10px;background:var(--hair);color:#000;font-weight:600;animation:up .2s steps(3) reverse}
+.app .pf{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #161713}
+.app .offline{position:absolute;left:0;right:0;top:0;padding:4px 8px;font-size:9.5px;background:#1d1e1a;color:var(--dim);text-align:center}
+
+@media (max-width:1180px){
+  .hero{grid-template-columns:300px minmax(0,1fr)}
+  .hero .right{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  .info{grid-template-columns:1fr 1fr}
+}
+@media (max-width:820px){
+  .hero{grid-template-columns:1fr}
+  .hero .right{grid-template-columns:1fr}
+  .info{grid-template-columns:1fr}
+  .head{grid-template-columns:auto 1fr}
+  .head p{grid-column:1/-1}
+  .face{width:72px;height:72px}
+}
+</style>
+</head>
+<body>
+<div class="boot" id="boot" role="status" aria-live="polite"></div>
+
+<nav class="bar" aria-label="status">
+  <span class="me">fomi</span>
+  <span class="live" id="barMode">demo feed</span>
+  <span>bank <b id="barBank">5.000</b> sol</span>
+  <span>pnl <b id="barPnl" class="pos">+0.00%</b></span>
+  <span>brain gen <b id="barGen">0</b></span>
+  <span class="grow"></span>
+  <a id="lnkX" href="#">x.com</a>
+  <a id="lnkGh" href="#">github</a>
+  <a id="lnkFomo" class="cta" href="#">trade with her on fomo</a>
+</nav>
+
+<main class="wrap">
+  <header class="head">
+    <img class="face" src="assets/fomi.png" alt="fomi, a green-haired girl rendered in terminal ascii art" width="104" height="104">
+<pre class="logo" id="logo" aria-label="FOMI">███████╗ ██████╗ ███╗   ███╗██╗
+██╔════╝██╔═══██╗████╗ ████║██║
+█████╗  ██║   ██║██╔████╔██║██║
+██╔══╝  ██║   ██║██║╚██╔╝██║██║
+██║     ╚██████╔╝██║ ╚═╝ ██║██║
+╚═╝      ╚═════╝ ╚═╝     ╚═╝╚═╝</pre>
+    <p>an ai that trades memecoins on fomo, starting with 5 sol. she researches on one screen and trades with her own thumbs on a phone on the other. <span>every rule she follows is open source.</span></p>
+  </header>
+
+  <div class="hero">
+    <!-- screen 1: phone -->
+    <section class="pane phone-pane" aria-label="screen 1, her phone">
+      <h2><i>●</i> screen 1 · her phone</h2>
+      <div class="phone-status"><span id="phoneSrc">demo phone</span><span id="phoneState">fomo app</span></div>
+      <div class="phone">
+        <div class="phone-screen" id="phoneScreen">
+          <img id="phoneImg" alt="live screen of fomi's phone running the fomo app" hidden>
+          <div class="app" id="app"></div>
+          <div class="taps" id="taps" aria-hidden="true"></div>
+        </div>
+      </div>
+      <div class="caption"><span class="who">thumb</span><span class="what" id="phoneCaption">idle</span></div>
+    </section>
+
+    <!-- screen 2: research -->
+    <section class="pane stream" aria-label="screen 2, her research">
+      <h2><i>●</i> screen 2 · her research</h2>
+      <div class="chrome" id="tabs" role="tablist"></div>
+      <div class="url">url <span id="url">—</span></div>
+      <div class="view" id="view" aria-live="off">
+        <svg class="cursor" id="cursor" viewBox="0 0 9 11" shape-rendering="crispEdges" aria-hidden="true"></svg>
+        <p class="page-title" id="pageTitle"></p>
+        <div id="lines"></div>
+      </div>
+      <div class="caption"><span class="who">fomi is</span><span class="what" id="caption">booting</span></div>
+    </section>
+
+    <div class="col right">
+      <section class="pane">
+        <h2><i>$</i> tail -f thoughts.log</h2>
+        <div class="log" id="log" aria-live="polite"></div>
+      </section>
+      <section class="pane">
+        <h2><i>$</i> last thesis</h2>
+        <p class="thesis" id="thesis"></p>
+        <div class="thesis-meta" id="thesisMeta">waiting for a token worth it</div>
+      </section>
+    </div>
+  </div>
+
+  <!-- brain -->
+  <section class="pane brain" aria-label="brain">
+    <h2><i>●</i> brain, live projection</h2>
+    <div class="sigs" id="sigs"></div>
+    <div class="canvas-wrap">
+      <canvas id="brainCanvas" aria-label="rotating ascii projection of fomi's brain; signals light up regions as they arrive"></canvas>
+      <div class="canvas-note" id="brainNote">drag to rotate</div>
+    </div>
+    <div class="verdict">
+      <div class="score" id="score">··<small>/100</small></div>
+      <div class="thr" id="thr"></div>
+      <div class="decision" id="decision">idle</div>
+      <ul class="reasons" id="reasons"></ul>
+      <div class="by" id="by"></div>
+    </div>
+  </section>
+
+  <div class="info">
+    <section class="pane">
+      <h2><i>$</i> cat bank</h2>
+      <div class="big" id="eq">5.000<small>sol</small></div>
+      <div class="meter" id="meter" aria-hidden="true"></div>
+      <dl class="kv">
+        <dt>started with</dt><dd id="kStart">5.000</dd>
+        <dt>cash</dt><dd id="kCash">5.000</dd>
+        <dt>in positions</dt><dd id="kExp">0.000</dd>
+        <dt>untouchable reserve</dt><dd id="kRes">1.000</dd>
+        <dt>today</dt><dd id="kDay">+0.000</dd>
+        <dt>trades</dt><dd id="kTrades">0</dd>
+        <dt>win rate</dt><dd id="kWr">—</dd>
+      </dl>
+    </section>
+    <section class="pane">
+      <h2><i>$</i> positions</h2>
+      <div id="positions"></div>
+    </section>
+    <section class="pane">
+      <h2><i>$</i> cat risk.rules</h2>
+      <ul class="rules" id="rules">
+        <li><b>1 sol</b> reserve is never traded</li>
+        <li>bet size <b>0.1–0.5 sol</b>, scaled by conviction</li>
+        <li>max <b>4</b> open, max <b>50%</b> of bank in market</li>
+        <li>stop <b>−25%</b>, sell half at <b>+60%</b>, rest at <b>+200%</b></li>
+        <li>trailing <b>35%</b> after first take profit</li>
+        <li>3 losses in a row → <b>2h</b> cooldown</li>
+        <li>−0.75 sol in a day → done for the day</li>
+        <li>the phone refuses any order above <b>0.5 sol</b></li>
+      </ul>
+    </section>
+  </div>
+
+  <div class="lower">
+    <section class="pane">
+      <h2><i>$</i> cat journal.csv</h2>
+      <div id="journal"></div>
+    </section>
+    <section class="pane weights">
+      <h2><i>$</i> brain --weights</h2>
+      <div id="weights"></div>
+      <ul class="lessons" id="lessons"></ul>
+    </section>
+    <section class="pane">
+      <h2><i>$</i> ls brain/</h2>
+<pre class="tree"><b>brain/</b>
+<i>├─</i> index.js      <i>main loop: scan → decide → trade</i>
+<i>├─</i> signals.js    <i>the 8 signals</i>
+<i>├─</i> learn.js      <i>weights evolve after every trade</i>
+<i>├─</i> llm.js        <i>final call + thesis</i>
+<i>├─</i> bank.js       <i>sizing and hard risk limits</i>
+<i>├─</i> phone/        <i>drives the fomo app on a cloud phone</i>
+<i>├─</i> executor/     <i>paper · manual · phone</i>
+<i>├─</i> live/         <i>streams both screens to this page</i>
+<i>├─</i> sources/      <i>gmgn · dexscreener · x</i>
+<i>└─</i> data/         <i>her memory, committed every tick</i></pre>
+      <code class="clone" id="clone">git clone https://github.com/growlingcas/fomi-agent</code>
+      <a class="gh" id="ghBtn" href="#">read her brain on github</a>
+    </section>
+  </div>
+
+  <section class="pane" style="margin-top:26px">
+    <h2><i>$</i> how she decides</h2>
+    <ol class="steps">
+      <li>scan fresh solana pairs <span>— new listings, boosts, volume</span></li>
+      <li>read <span>— the screener row, mentions on x, theses on the fomo feed</span></li>
+      <li>score eight signals <span>— momentum, volume, buyers, liquidity, freshness, social, smart money, safety</span></li>
+      <li>decide <span>— rules first, then a small llm makes the final call and writes the thesis</span></li>
+      <li>size the bet <span>— from conviction, inside hard bank limits</span></li>
+      <li>trade on the phone <span>— opens fomo, pastes the contract, types the amount, checks the ticker, confirms</span></li>
+      <li>exit <span>— stop, take profits, trailing, time stop</span></li>
+      <li>learn <span>— every closed trade shifts the weights; a new brain generation</span></li>
+    </ol>
+  </section>
+
+  <footer>
+    <p>fomi is an experiment. she loses money too. nothing here is financial advice, and her positions are public so you can judge her yourself.</p>
+    <p id="updated">no live data yet — showing a demo feed</p>
+  </footer>
+</main>
+<script>
+"use strict";
+/* ════════════════════════════════════════════════════════════════
+   fomi — сайт. Читает state.json (его пишет brain/). Если файла нет —
+   крутит демо-ленту, чтобы было видно, как всё работает.
+   ════════════════════════════════════════════════════════════════ */
+const CONFIG = {
+  fomoUrl: "https://fomo.family",                  // ← твоя реф-ссылка на fomo
+  fomoSite: "https://fomo.family",                 // страницы токенов: /tokens/solana/<CA>
+  xUrl: "https://x.com/fomi",
+  githubUrl: "https://github.com/growlingcas/fomi-agent",
+  stateUrl: "state.json",
+  liveUrl: "",                                      // ← адрес live-сервера (npm run live), напр. https://fomi-live.example.com
+  pollMs: 30000,
+};
+const SIGNALS = ["momentum","volume","buyers","liquidity","freshness","social","smart","safety"];
+const SIG_COLOR = { momentum:"#F0306E", volume:"#B8F20A", buyers:"#F0306E", liquidity:"#5FAFFF", freshness:"#5CF02A", social:"#FFD9C0", smart:"#FFFFFF", safety:"#5FAFFF" };
+const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const $ = (id) => document.getElementById(id);
+const sleep = (ms) => new Promise((r) => setTimeout(r, reduced ? Math.min(ms, 60) : ms));
+const rnd = (a, b) => a + Math.random() * (b - a);
+const pick = (a) => a[Math.floor(Math.random() * a.length)];
+const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]));
+const fmt = (n, d = 3) => (+n).toFixed(d);
+const sgn = (n, d = 2) => (n >= 0 ? "+" : "") + (+n).toFixed(d);
+const pct = (n) => (n >= 0 ? "+" : "") + (n * 100).toFixed(1) + "%";
+const hhmm = (t = Date.now()) => new Date(t).toTimeString().slice(0, 8);
+const kfmt = (n) => (n >= 1e6 ? (n / 1e6).toFixed(1) + "m" : n >= 1e3 ? (n / 1e3).toFixed(0) + "k" : Math.round(n) + "");
+const pad = (s, n) => String(s).padEnd(n).slice(0, n);
+
+/* ── состояние, которое видит сайт ── */
+const S = {
+  live: false,
+  bank: { start: 5, cash: 5, equity: 5, reserve: 1, exposure: 0, pnl: 0, pnlPct: 0, dayPnl: 0 },
+  positions: [], journal: [], stats: { trades: 0, winrate: 0 },
+  brain: { generation: 0, threshold: 62, weights: { momentum:1.2, volume:1.1, buyers:1.3, liquidity:.9, freshness:.7, social:.8, smart:1.2, safety:1.4 }, lessons: [] },
+  episodes: [], played: new Set(), updatedAt: 0, llm: "rules",
+};
+
+/* ════════════ демо-генератор (когда нет state.json) ════════════ */
+const SYL = ["mo","ki","zu","ra","pe","lo","fi","ny","gu","ta","bo","xi","da","wo","su","mi","ke","po"];
+const HANDLES = ["degen_ilya","solsniper","pumpwatch","0xmika","chartnun","ape_unit","kek_capital","lowcapdan","mr_bondingcurve","jeetfilter"];
+const FOMOERS = ["anon_k","meri","bagholder.sol","quietape","lin","tomo","vex","ricky.f"];
+const TWEETS = ["volume picking up on {T}, dev still active","{T} chart is clean ngl","who is buying {T} at this level","{T} community is cooking","rug vibes on {T}, careful","{T} cto forming, tg is alive","bonding curve almost done for {T}","{T} just flipped resistance"];
+const THESES = ["aping small {T}, thesis: holders keep growing","took profits on {T}, still holding a bag","{T} is the cleanest chart on the feed today","selling half {T} here, too fast","{T}: real buyers, not bots. in.","{T} looks like a slow grind, fine with that"];
+
+function demoToken() {
+  const sym = (pick(SYL) + pick(SYL) + (Math.random() < .35 ? pick(SYL) : "")).toUpperCase();
+  const liq = rnd(9000, 240000), h1 = rnd(-35, 140);
+  return { symbol: sym, ageMin: rnd(8, 2400), liqUsd: liq, fdv: liq * rnd(3, 25), vol1h: rnd(2000, 300000),
+    chg: { m5: rnd(-12, 22), h1, h24: h1 * rnd(1, 3) }, b: Math.floor(rnd(30, 900)), s: Math.floor(rnd(20, 700)),
+    holders: Math.floor(rnd(60, 2400)), price: rnd(0.0000005, 0.00004),
+    smart: Math.floor(rnd(0, 7)), kol: Math.floor(rnd(0, 4)), rug: +rnd(0, .3).toFixed(2), top10: rnd(.1, .55) };
+}
+const ageStr = (m) => (m < 60 ? Math.round(m) + "m" : m < 1440 ? (m / 60).toFixed(0) + "h" : (m / 1440).toFixed(0) + "d");
+const demoRow = (t) => `${pad("$" + t.symbol, 9)} ${pad(ageStr(t.ageMin), 4)} ${pad(kfmt(t.liqUsd), 9)} ${pad(kfmt(t.fdv), 8)} ${pad(kfmt(t.vol1h), 9)} ${pad((t.chg.h1 >= 0 ? "+" : "") + t.chg.h1.toFixed(0) + "%", 5)} ${pad(t.smart, 5)} ${t.rug.toFixed(2)}`;
+
+function spark(n = 46) {
+  const bars = " ▁▂▃▄▅▆▇█"; let v = rnd(2, 5), out = "";
+  for (let i = 0; i < n; i++) { v = clamp(v + rnd(-1.4, 1.6) + (i > n * .7 ? .35 : 0), 0, 8); out += bars[Math.round(v)]; }
+  return out;
+}
+
+function demoEpisode() {
+  const list = Array.from({ length: 12 }, demoToken);
+  const t = list[Math.floor(rnd(0, 6))];
+  const T = "$" + t.symbol;
+  const sig = {
+    momentum: clamp((t.chg.h1 + 10) / 90), volume: clamp(t.vol1h / t.liqUsd / 3), buyers: clamp((t.b / (t.b + t.s) - .42) / .28),
+    liquidity: clamp((Math.log10(t.liqUsd) - 4.1) / 1.3), freshness: t.ageMin < 360 ? 1 : clamp(1 - t.ageMin / 4300),
+    social: rnd(.2, .95), smart: clamp((t.smart + t.kol * .5) / 6), safety: clamp(1 - (t.fdv / t.liqUsd - 8) / 40 - (t.chg.h1 > 150 ? .3 : 0) - t.rug * .8),
+  };
+  let w = 0, s = 0; for (const k of SIGNALS) { s += S.brain.weights[k] * sig[k]; w += S.brain.weights[k]; }
+  const score = Math.round(100 * s / w);
+  const enter = score >= S.brain.threshold && sig.safety > .45 && S.positions.length < 4;
+  const strong = Object.entries(sig).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([k]) => k);
+  const weak = Object.entries(sig).sort((a, b) => a[1] - b[1])[0][0];
+  const size = enter ? +clamp((S.bank.equity - 1) * .06 * (.5 + (score - 55) / 40), .1, .5).toFixed(2) : null;
+  return {
+    symbol: t.symbol, demo: true,
+    pages: [
+      { source: "gmgn", url: "gmgn.ai/new-pairs?chain=sol", title: "new pairs · solana · sorted by volume", head: `${pad("token", 9)} ${pad("age", 4)} ${pad("liquidity", 9)} ${pad("mcap", 8)} ${pad("vol 1h", 9)} ${pad("1h", 5)} ${pad("smart", 5)} rug`, lines: list.map(demoRow), focus: [list.indexOf(t)] },
+      { source: "gmgn token", url: `gmgn.ai/sol/token/${t.symbol.toLowerCase()}`, title: `${T} · holders & risk`, lines: [`holders ${t.holders}   top10 ${(t.top10 * 100).toFixed(0)}%`, `smart money ${t.smart}   kol ${t.kol}   snipers ${Math.floor(rnd(0, 25))}`, `rug ratio ${t.rug.toFixed(2)}   bundlers ${Math.floor(rnd(0, 30))}%`, `dev ${Math.random() < .5 ? "sold / closed" : "still holding"}   mint renounced   freeze renounced`, `platform ${pick(["Pump.fun", "letsbonk", "pool_meteora"])}`], focus: [1, 2] },
+      { source: "x", url: `x.com/search?q=%24${t.symbol}&f=live`, title: `latest · ${T}`, lines: Array.from({ length: 6 }, () => `@${pad(pick(HANDLES), 16)} ${pick(TWEETS).replace("{T}", T)}`), focus: [Math.floor(rnd(0, 3)), Math.floor(rnd(3, 6))] },
+      { source: "fomo", url: `fomo · feed · ${T}`, title: `${T} · theses from the feed`, lines: Array.from({ length: 5 }, () => `${pad(pick(FOMOERS), 14)} ${pick(THESES).replace("{T}", T)}`).concat([`${pad("buys 1h", 14)} ${t.b}   sells ${t.s}   holders ${t.holders}`]), focus: [0, 5] },
+      { source: "chart", url: `dexscreener.com/solana/${t.symbol.toLowerCase()}`, title: `${T}/SOL · 5m`, lines: [spark(), spark(), "", `price   ${t.price.toExponential(3)} sol`, `chg     m5 ${sgn(t.chg.m5, 0)}%   h1 ${sgn(t.chg.h1, 0)}%   h24 ${sgn(t.chg.h24, 0)}%`, `liq     ${kfmt(t.liqUsd)}   fdv ${kfmt(t.fdv)}   age ${ageStr(t.ageMin)}`], focus: [4, 5] },
+    ],
+    signals: sig, score, threshold: S.brain.threshold, decision: enter ? "ENTER" : "SKIP",
+    conviction: clamp((score - S.brain.threshold + 15) / 30),
+    reasons: strong.map((k) => `${k} ${(sig[k] * 100).toFixed(0)}`), risks: [`${weak} is weak`],
+    thesis: enter ? `${T}: ${strong[0]} and ${strong[1]} lining up, liq ${kfmt(t.liqUsd)}. small size, tight stop. nfa` : "",
+    size, by: "demo",
+  };
+}
+
+/* демо-банк: позиции живут и закрываются, мозг «учится» */
+function demoMarketStep() {
+  for (const p of [...S.positions]) {
+    p.pnlPct = p.pnlPct + rnd(-.09, .1) + (Math.random() < .04 ? rnd(-.3, .7) : 0);
+    let reason = null;
+    if (p.pnlPct <= -.25) reason = "stop loss"; else if (p.pnlPct >= 2) reason = "tp2";
+    else if (p.pnlPct >= .6 && !p.tp1Done) { p.tp1Done = true; S.bank.cash += p.sizeSol * .5 * (1 + p.pnlPct); p.remaining = .5; logLine("money", `sold half $${p.symbol} at ${pct(p.pnlPct)} (tp1)`); phoneUI.sell(p, "tp1", "50%"); }
+    else if (Math.random() < .03) reason = "time stop";
+    if (reason) {
+      const pnlSol = p.sizeSol * p.remaining * p.pnlPct + (p.tp1Done ? p.sizeSol * .5 * .6 : 0);
+      S.bank.cash += p.sizeSol * p.remaining * (1 + p.pnlPct);
+      S.positions = S.positions.filter((x) => x !== p);
+      const tr = { symbol: p.symbol, sizeSol: p.sizeSol, pnlSol, pnlPct: pnlSol / p.sizeSol, reason, closedAt: Date.now() };
+      S.journal.unshift(tr); S.journal = S.journal.slice(0, 30);
+      const wins = S.journal.filter((x) => x.pnlSol > 0).length;
+      S.stats = { trades: S.journal.length, winrate: wins / S.journal.length };
+      // обучение
+      const top = pick(SIGNALS), d = .15 * clamp(tr.pnlPct, -1, 2) * (p.signals[top] - .5);
+      S.brain.weights[top] = +clamp(S.brain.weights[top] + d, .2, 3).toFixed(3);
+      S.brain.generation++;
+      S.brain.lessons.unshift({ t: Date.now(), text: `gen ${S.brain.generation}: $${p.symbol} ${pct(tr.pnlPct)} → ${top} ${d >= 0 ? "↑" : "↓"}` });
+      S.brain.lessons = S.brain.lessons.slice(0, 8);
+      logLine("money", `closed $${p.symbol} ${pct(tr.pnlPct)} (${reason})`);
+      phoneUI.sell(p, reason, "100%");
+      logLine("think", `brain gen ${S.brain.generation}: ${top} weight ${d >= 0 ? "up" : "down"}`);
+    }
+  }
+  const inPos = S.positions.reduce((s, p) => s + p.sizeSol * p.remaining * (1 + p.pnlPct), 0);
+  S.bank.exposure = S.positions.reduce((s, p) => s + p.sizeSol * p.remaining, 0);
+  S.bank.equity = S.bank.cash + inPos;
+  S.bank.pnl = S.bank.equity - S.bank.start; S.bank.pnlPct = S.bank.pnl / S.bank.start;
+  S.bank.dayPnl = S.bank.pnl;
+  renderPanels();
+}
+function demoBuy(ep) {
+  S.bank.cash -= ep.size;
+  S.positions.push({ symbol: ep.symbol, sizeSol: ep.size, remaining: 1, pnlPct: 0, signals: ep.signals, thesis: ep.thesis, openedAt: Date.now(), score: ep.score });
+  demoMarketStep();
+}
+</script>
+<script>
+"use strict";
+/* ════════════ лента мыслей ════════════ */
+function logLine(cls, text) {
+  const log = $("log");
+  const d = document.createElement("div");
+  d.innerHTML = `<span class="ts">${hhmm()}</span> <span class="${cls}">${esc(text)}</span>`;
+  log.appendChild(d);
+  while (log.children.length > 40) log.firstChild.remove();
+}
+
+/* ════════════ стрим её экрана ════════════ */
+const stream = document.querySelector(".stream");
+const cursor = $("cursor");
+stream.appendChild(cursor);
+(function drawCursor() {             // пиксельная стрелка: X — обводка, O — заливка цвета её глаз
+  const rows = ["X.........","XX........","XOX.......","XOOX......","XOOOX.....","XOOOOX....","XOOOOOX...","XOOOOOOX..","XOOOOOOOX.","XOOOOOXXXX","XOOXOOX...","XOX.XOOX..","XX..XOOX..","X....XOOX.",".....XOOX.","......XX.."];
+  cursor.setAttribute("viewBox", "0 0 10 16");
+  cursor.innerHTML = rows.map((r, y) => [...r].map((c, x) => c === "." ? "" : `<rect x="${x}" y="${y}" width="1" height="1" fill="${c === "X" ? "#000" : "#5FAFFF"}"/>`).join("")).join("");
+})();
+let cur = { x: 60, y: 120 };
+function cursorTo(el, fx = .35, fy = .55) {
+  const r = el.getBoundingClientRect(), s = stream.getBoundingClientRect();
+  cur = { x: r.left - s.left + Math.min(r.width * fx, 260) + rnd(-6, 6), y: r.top - s.top + r.height * fy };
+  cursor.style.setProperty("--t", `translate(${cur.x}px,${cur.y}px)`);
+  cursor.style.transform = `translate(${cur.x}px,${cur.y}px)`;
+  return sleep(800);
+}
+async function click() { cursor.classList.remove("click"); void cursor.offsetWidth; cursor.classList.add("click"); await sleep(260); }
+async function typeInto(el, text, cps = 70) {
+  el.textContent = "";
+  if (reduced) { el.textContent = text; return; }
+  for (let i = 0; i < text.length; i++) { el.textContent += text[i]; if (i % 2 === 0) await sleep(1000 / cps); }
+}
+const SOURCE_SIGNALS = { gmgn: ["momentum","volume","liquidity","freshness","smart"], "gmgn token": ["smart","safety"], dexscreener: ["momentum","volume","liquidity","freshness"], "mock screener": ["momentum","volume","liquidity","freshness"], x: ["social"], fomo: ["social","buyers"], chart: ["momentum","buyers","safety"] };
+
+function setTabs(sources, active) {
+  $("tabs").innerHTML = sources.map((s) => `<span class="tab${s === active ? " on" : ""}" role="tab" aria-selected="${s === active}">${esc(s)}</span>`).join("") + `<span class="rec">rec</span>`;
+}
+
+async function showPage(ep, page, sources) {
+  const caption = $("caption");
+  const tabEl = [...$("tabs").children].find((t) => t.textContent === page.source);
+  caption.textContent = `opening ${page.source}`;
+  if (tabEl) { await cursorTo(tabEl, .5, .5); await click(); }
+  setTabs(sources, page.source);
+  await typeInto($("url"), "https://" + page.url.replace(/^https?:\/\//, ""), 110);
+  $("pageTitle").textContent = page.title || page.source;
+  const box = $("lines");
+  box.innerHTML = "";
+  if (page.head) { const h = document.createElement("div"); h.className = "ln head"; h.textContent = page.head; $("pageTitle").after(h); }
+  document.querySelectorAll(".view > .ln.head").forEach((h, i, all) => { if (!page.head || i < all.length - 1) h.remove(); });
+  page.lines.forEach((l, i) => {
+    const d = document.createElement("div");
+    d.className = "ln in"; d.style.animationDelay = (reduced ? 0 : i * 45) + "ms";
+    d.innerHTML = `<span class="sweep"></span>${esc(l || " ")}`;
+    box.appendChild(d);
+  });
+  await sleep(500 + page.lines.length * 45);
+
+  for (const i of page.focus || []) {
+    const el = box.children[i];
+    if (!el) continue;
+    await cursorTo(el);
+    const text = (page.lines[i] || "").replace(/\s+/g, " ").trim();
+    caption.textContent = `reading ${text.slice(0, 90)}`;
+    el.classList.add("read");
+    logLine("read", `${page.source}: ${text.slice(0, 120)}`);
+    for (const s of SOURCE_SIGNALS[page.source] || []) brainViz.fire(s, ep.signals?.[s] ?? .5);
+    await sleep(1500);
+    el.classList.remove("read"); el.classList.add("seen");
+  }
+  await sleep(400);
+}
+
+async function think(ep) {
+  $("caption").textContent = `thinking about $${ep.symbol}`;
+  renderSignals(ep.signals, true);
+  for (const s of SIGNALS) { brainViz.fire(s, ep.signals[s]); await sleep(170); }
+  logLine("think", `$${ep.symbol} signals: ` + SIGNALS.map((s) => `${s.slice(0, 4)} ${(ep.signals[s] * 100).toFixed(0)}`).join(" "));
+  // счётчик скора
+  const el = $("score");
+  for (let v = 0; v <= ep.score; v += Math.max(1, Math.round(ep.score / 24))) { el.innerHTML = `${v}<small>/100</small>`; await sleep(28); }
+  el.innerHTML = `${ep.score}<small>/100</small>`;
+  const w = 24, tpos = Math.round(ep.threshold / 100 * w), spos = Math.round(ep.score / 100 * w);
+  let bar = ""; for (let i = 0; i < w; i++) bar += i === tpos ? "┃" : i < spos ? "█" : "░";
+  $("thr").textContent = `${bar}\nneeds ${ep.threshold} to enter`;
+  await sleep(500);
+  const enter = ep.decision === "ENTER";
+  const dec = $("decision");
+  dec.textContent = enter ? "enter" : "skip";
+  dec.className = "decision " + (enter ? "enter" : "skip");
+  $("reasons").innerHTML = (ep.reasons || []).map((r) => `<li>+ ${esc(r)}</li>`).join("") + (ep.risks || []).map((r) => `<li class="r">− ${esc(r)}</li>`).join("");
+  $("by").textContent = `decided by ${ep.by || "rules"}${ep.demo ? " · demo" : ""}`;
+  brainViz.decide(enter);
+  logLine("think", enter ? `$${ep.symbol} ${ep.score}/${ep.threshold} — entering with ${ep.size} sol` : `$${ep.symbol} ${ep.score}/${ep.threshold} — skip. ${(ep.risks || [])[0] || ""}`);
+  await sleep(900);
+}
+
+async function act(ep, sources) {
+  if (ep.decision !== "ENTER") { $("caption").textContent = "moving on"; await sleep(900); return; }
+  $("caption").textContent = `sending $${ep.symbol} to the phone →`;
+  logLine("money", `→ phone: buy $${ep.symbol} · ${ep.size} sol`);
+  typeInto($("thesis"), ep.thesis, 60);
+  $("thesisMeta").textContent = `$${ep.symbol} · ${ep.size} sol · score ${ep.score} · ${hhmm()}`;
+  if (ep.demo) {
+    await phoneUI.buy(ep);                      // демо: ждём, пока «палец» закончит
+    logLine("money", `bought $${ep.symbol} · ${ep.size} sol`);
+    logLine("voice", `“${ep.thesis}”`);
+    demoBuy(ep);
+  } else {
+    await sleep(2500);                          // live: реальный телефон делает это сам, видно на экране 1
+  }
+  await sleep(800);
+}
+
+async function playEpisode(ep) {
+  const sources = ep.pages.map((p) => p.source);
+  setTabs(sources, sources[0]);
+  logLine("sys", `${ep.replay ? "replay" : "new"}: looking at $${ep.symbol}`);
+  $("decision").textContent = "reading"; $("decision").className = "decision";
+  $("score").innerHTML = `··<small>/100</small>`;
+  for (const p of ep.pages) await showPage(ep, p, sources);
+  await think(ep);
+  await act(ep, sources);
+}
+
+function nextEpisode() {
+  if (S.live && S.episodes.length) {
+    const fresh = S.episodes.filter((e) => !S.played.has(e.id));
+    const ep = fresh.length ? fresh[0] : { ...pick(S.episodes.slice(-8)), replay: true };
+    S.played.add(ep.id);
+    return ep;
+  }
+  return demoEpisode();
+}
+
+async function director() {
+  for (;;) {
+    try { await playEpisode(nextEpisode()); } catch (e) { console.error(e); await sleep(1500); }
+    if (!S.live) demoMarketStep();
+  }
+}
+</script>
+<script>
+"use strict";
+/* ════════════ экран 1: телефон ════════════
+   live: кадры с /phone.jpg + касания из потока событий.
+   demo: условное приложение, которое она «тыкает» сама (интерфейс выдуман, это не копия fomo). */
+const phoneUI = (() => {
+  const app = $("app"), taps = $("taps"), img = $("phoneImg"), cap = $("phoneCaption");
+  let live = false, busy = false, idleTimer = null, feedShift = 0;
+  const queue = [];
+
+  function ripple(fx, fy) {
+    const d = document.createElement("div"); d.className = "tapdot";
+    d.style.left = fx * 100 + "%"; d.style.top = fy * 100 + "%";
+    taps.appendChild(d); setTimeout(() => d.remove(), 750);
+  }
+  async function tapEl(sel, label) {
+    const el = typeof sel === "string" ? app.querySelector(sel) : sel;
+    if (label) cap.textContent = label;
+    if (!el) return sleep(300);
+    const r = el.getBoundingClientRect(), b = app.getBoundingClientRect();
+    ripple((r.left + r.width / 2 - b.left) / b.width, (r.top + r.height / 2 - b.top) / b.height);
+    await sleep(650);
+  }
+  const nav = (on) => `<div class="nav"><span class="${on === "feed" ? "on" : ""}">feed</span><span class="${on === "search" ? "on" : ""}" data-k="search">search</span><span class="${on === "pf" ? "on" : ""}" data-k="pf">portfolio</span></div>`;
+  const fakeCA = (sym) => (sym + "x" + Math.random().toString(36).slice(2) + "pump").slice(0, 32);
+
+  function feedScreen() {
+    const posts = Array.from({ length: 9 }, (_, i) => {
+      const u = FOMOERS[(i + feedShift) % FOMOERS.length], T = "$" + (SYL[(i * 3 + feedShift) % SYL.length] + SYL[(i * 5 + 2 + feedShift) % SYL.length]).toUpperCase();
+      return `<div class="post"><b>${u}</b> <span class="amt">bought ${(0.1 + ((i * 7 + feedShift) % 9) / 10).toFixed(1)} sol</span><br>${esc(THESES[(i + feedShift) % THESES.length]).replace("{T}", `<span class="tk">${T}</span>`)}</div>`;
+    }).join("");
+    app.innerHTML = `<div class="top">feed <small>${hhmm().slice(0, 5)}</small></div><div class="body">${posts}</div>${nav("feed")}${live ? `<div class="offline">phone offline · showing demo</div>` : ""}`;
+  }
+  function idle() {
+    clearTimeout(idleTimer);
+    if (live || busy) return;
+    if (queue.length) { run(queue.shift()); return; }
+    feedShift++; feedScreen(); cap.textContent = "scrolling the feed";
+    idleTimer = setTimeout(idle, 2600);
+  }
+  async function run(job) {
+    busy = true; clearTimeout(idleTimer);
+    try { await job(); } catch (e) { console.error(e); }
+    busy = false; setTimeout(idle, 1500);
+  }
+  const enqueue = (job) => { if (live) return Promise.resolve(); return new Promise((res) => { queue.push(async () => { await job(); res(); }); if (!busy) idle(); }); };
+
+  async function typeField(el, text, cps = 40) { el.classList.add("focus"); el.textContent = ""; for (const ch of text) { el.textContent += ch; await sleep(1000 / cps); } }
+
+  async function openToken(ep) {
+    feedScreen(); await sleep(300);
+    await tapEl('[data-k="search"]', "opening search");
+    app.innerHTML = `<div class="top">search</div><div class="body"><div class="field" id="f"></div><div id="r"></div></div>${nav("search")}`;
+    await tapEl("#f", "search field");
+    await typeField($("f"), fakeCA(ep.symbol), 70);
+    cap.textContent = `pasted CA of $${ep.symbol}`;
+    $("r").innerHTML = `<div class="res"><b>$${esc(ep.symbol)}</b> <span style="color:var(--dim)">· solana</span></div>`;
+    await sleep(400); await tapEl(".res", `opening $${ep.symbol}`);
+    app.innerHTML = `<div class="top">$${esc(ep.symbol)} <small>solana</small></div><div class="body">
+      <div class="tkname">$${esc(ep.symbol)}</div><div class="price">score ${ep.score}/100 from her brain</div>
+      <div class="spark">${spark(30)}\n${spark(30)}</div>
+      <div class="row2"><span>momentum</span><b>${(ep.signals.momentum * 100) | 0}</b><span>buyers</span><b>${(ep.signals.buyers * 100) | 0}</b><span>liquidity</span><b>${(ep.signals.liquidity * 100) | 0}</b><span>safety</span><b>${(ep.signals.safety * 100) | 0}</b></div>
+      </div><div class="btns"><div class="btn" id="bBuy">buy</div><div class="btn sell" id="bSell">sell</div></div>`;
+    await sleep(500);
+  }
+
+  function buy(ep) {
+    return enqueue(async () => {
+      await openToken(ep);
+      await tapEl("#bBuy", "buy");
+      const sheet = document.createElement("div"); sheet.className = "sheet";
+      sheet.innerHTML = `<div style="color:var(--dim)">amount, sol</div><div class="field" id="amt"></div>
+        <div class="chips"><span class="chip">0.1</span><span class="chip">0.25</span><span class="chip">0.5</span></div>
+        <div style="color:var(--dim);margin-bottom:8px">buying <b style="color:#fff">$${esc(ep.symbol)}</b></div>
+        <div class="btns" style="padding:0 0 12px"><div class="btn pink full" id="bConf">confirm buy</div></div>`;
+      app.appendChild(sheet);
+      await tapEl("#amt", "amount");
+      await typeField($("amt"), String(ep.size), 12);
+      cap.textContent = `checking: ticker is $${ep.symbol}, amount ${ep.size} sol`; await sleep(900);
+      await tapEl("#bConf", `confirm buy ${ep.size} sol`);
+      sheet.remove();
+      const t = document.createElement("div"); t.className = "toast"; t.textContent = `bought ${ep.size} sol of $${ep.symbol}`; app.appendChild(t);
+      cap.textContent = "order filled"; await sleep(1300); t.remove();
+      // тезис в ленту
+      app.innerHTML = `<div class="top">new thesis</div><div class="body"><div class="field" id="th" style="min-height:120px"></div></div><div class="btns"><div class="btn full" id="bPost">post</div></div>`;
+      await tapEl("#th", "writing thesis");
+      await typeField($("th"), ep.thesis, 55);
+      await tapEl("#bPost", "posting thesis");
+      cap.textContent = "thesis posted";
+      await sleep(800);
+    });
+  }
+  function sell(p, reason, pctTxt) {
+    return enqueue(async () => {
+      await openToken({ symbol: p.symbol, score: p.score || 0, signals: p.signals || Object.fromEntries(SIGNALS.map((s) => [s, .5])) });
+      await tapEl("#bSell", "sell");
+      const sheet = document.createElement("div"); sheet.className = "sheet";
+      sheet.innerHTML = `<div style="color:var(--dim)">sell $${esc(p.symbol)} · ${esc(reason)}</div><div class="chips" style="margin-top:8px"><span class="chip ${pctTxt === "50%" ? "on" : ""}" id="c50">50%</span><span class="chip ${pctTxt === "100%" ? "on" : ""}" id="c100">100%</span></div><div class="btns" style="padding:0 0 12px"><div class="btn sell full" id="bConf">confirm sell</div></div>`;
+      app.appendChild(sheet);
+      await tapEl(pctTxt === "50%" ? "#c50" : "#c100", pctTxt);
+      await tapEl("#bConf", `confirm sell ${pctTxt}`);
+      sheet.remove(); cap.textContent = `sold ${pctTxt} $${p.symbol}`; await sleep(900);
+    });
+  }
+
+  // live-режим
+  let frameTimer = null;
+  function goLive(base, imgPath = "/phone.jpg", every = 1100) {
+    live = true; clearTimeout(idleTimer);
+    document.querySelector(".phone-status").classList.add("on");
+    $("phoneSrc").textContent = "vmos cloud phone · live";
+    const load = () => {
+      if (document.hidden) return;
+      const n = new Image();
+      n.onload = () => { img.src = n.src; img.hidden = false; app.hidden = true; $("phoneSrc").textContent = "vmos cloud phone · live"; document.querySelector(".phone-status").classList.add("on"); };
+      n.onerror = () => { img.hidden = true; app.hidden = false; $("phoneSrc").textContent = "phone offline · demo"; document.querySelector(".phone-status").classList.remove("on"); if (!app.innerHTML) feedScreen(); };
+      n.src = `${base}${imgPath}?t=${Date.now()}`;
+    };
+    load(); frameTimer = setInterval(load, every);
+  }
+  function onEvent(e) {
+    if (e.type === "tap") { ripple(e.fx, e.fy); cap.textContent = e.label || e.step; }
+    if (e.type === "phone-step") cap.textContent = e.label;
+  }
+
+  feedScreen(); idleTimer = setTimeout(idle, 2000);
+  return { buy, sell, goLive, onEvent, get live() { return live; } };
+})();
+</script>
+<script>
+"use strict";
+/* ════════════ 3D-проекция мозга в ASCII ════════════
+   Облако точек в форме мозга крутится, z-buffer по сетке символов,
+   сигналы прилетают слева частицами и подсвечивают свои зоны. */
+const brainViz = (() => {
+  const cv = $("brainCanvas"), ctx = cv.getContext("2d");
+  const RAMP = " .,:;-=+*#%@";
+  const FS = 11;
+  let cw = 7, ch = 13, cols = 100, rows = 34, W = 0, H = 0, dpr = 1;
+  const pts = [], nrm = [], pw = [];
+  const NS = SIGNALS.length;
+  // зоны мозга для каждого сигнала (координаты модели)
+  const REG = {
+    momentum: [-.35, .35, .65], volume: [.35, .4, .55], buyers: [-.45, .1, -.2], liquidity: [.45, .05, -.25],
+    freshness: [0, .55, .1], social: [-.3, -.15, .55], smart: [.4, .45, .1], safety: [.25, -.35, -.55],
+  };
+
+  function add(p, n) { pts.push(p); nrm.push(n); }
+  (function build() {
+    const N = 3400;
+    for (let i = 0; i < N; i++) {
+      const u = Math.random() * 2 - 1, th = Math.random() * Math.PI * 2, r0 = Math.sqrt(1 - u * u);
+      const d = [r0 * Math.cos(th), u, r0 * Math.sin(th)];          // x, y, z на сфере
+      const roll = Math.random();
+      if (roll < .8) {                                             // полушария
+        const side = d[0] >= 0 ? 1 : -1;
+        if (d[0] * side < .08) continue;                           // продольная щель
+        const g = 1 + .07 * Math.sin(11 * Math.atan2(d[2], d[1]) + 5 * d[0]) * Math.cos(9 * Math.asin(d[1])) + .035 * Math.sin(23 * d[2] + 7 * d[1]);
+        let x = side * .05 + d[0] * .52 * g, y = d[1] * .6 * g, z = d[2] * .9 * g;
+        if (y < -.28) y = -.28 + (y + .28) * .45;
+        add([x, y, z], d);
+      } else if (roll < .95) {                                     // мозжечок
+        const g = 1 + .05 * Math.sin(40 * d[1]);
+        add([d[0] * .5 * g, -.42 + d[1] * .2 * g, -.55 + d[2] * .3 * g], d);
+      } else {                                                     // ствол
+        const t = Math.random();
+        add([Math.cos(th) * .1, -.45 - t * .5, -.25 + Math.sin(th) * .1], [Math.cos(th), 0, Math.sin(th)]);
+      }
+    }
+    for (const p of pts) for (const s of SIGNALS) {
+      const c = REG[s], dd = (p[0] - c[0]) ** 2 + (p[1] - c[1]) ** 2 + (p[2] - c[2]) ** 2;
+      pw.push(Math.exp(-dd / .09));
+    }
+  })();
+
+  const act = Object.fromEntries(SIGNALS.map((s) => [s, 0]));
+  const parts = [];
+  let yaw = 0, pitch = -.32, vyaw = .0035, dragging = false, lx = 0, ly = 0, flash = 0, flashColor = "#F0306E", t0 = 0;
+
+  // палитры: зелёные уровни + уровни каждого цвета сигнала
+  const mix = (hex, k) => { const n = parseInt(hex.slice(1), 16); const r = (n >> 16) * k, g = ((n >> 8) & 255) * k, b = (n & 255) * k; return `rgb(${r | 0},${g | 0},${b | 0})`; };
+  const GREEN = Array.from({ length: 8 }, (_, i) => mix("#5CF02A", .16 + i * .12));
+  const PAL = {}; for (const s of SIGNALS) PAL[s] = Array.from({ length: 5 }, (_, i) => mix(SIG_COLOR[s], .45 + i * .14));
+
+  function resize() {
+    const r = cv.getBoundingClientRect();
+    dpr = Math.min(2, devicePixelRatio || 1);
+    W = r.width; H = r.height;
+    cv.width = W * dpr; cv.height = H * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.font = `600 ${FS}px "Martian Mono", ui-monospace, Menlo, monospace`;
+    cw = ctx.measureText("M").width; ch = FS * 1.18;
+    cols = Math.floor(W / cw); rows = Math.floor(H / ch);
+  }
+  new ResizeObserver(resize).observe(cv);
+  document.fonts?.ready.then(resize);
+
+  cv.addEventListener("pointerdown", (e) => { dragging = true; lx = e.clientX; ly = e.clientY; cv.setPointerCapture(e.pointerId); });
+  cv.addEventListener("pointermove", (e) => { if (!dragging) return; vyaw = (e.clientX - lx) * .004; yaw += vyaw; pitch = clamp(pitch + (e.clientY - ly) * .004, -1.2, 1.2); lx = e.clientX; ly = e.clientY; });
+  cv.addEventListener("pointerup", () => { dragging = false; });
+  cv.style.touchAction = "pan-y";
+
+  const rot = (p) => {
+    const cy = Math.cos(yaw), sy = Math.sin(yaw), cp = Math.cos(pitch), sp = Math.sin(pitch);
+    let x = p[0] * cy + p[2] * sy, z = -p[0] * sy + p[2] * cy;
+    let y = p[1] * cp - z * sp; z = p[1] * sp + z * cp;
+    return [x, y, z];
+  };
+  const proj = (p) => {
+    const zz = p[2] + 3.1, f = Math.min(W * .95, H * 2.1) / zz;
+    return [(W / 2 + p[0] * f) / cw, (H / 2 - p[1] * f * 1.0) / ch, zz];
+  };
+
+  function fire(sig, intensity = .6) {
+    if (!(sig in act)) return;
+    const k = SIGNALS.indexOf(sig);
+    const from = [-2.3, .9 - k * .26, .2];
+    parts.push({ sig, t: 0, from, speed: .012 + Math.random() * .008, power: .25 + intensity * .9, out: false });
+  }
+  function decide(enter) {
+    flash = 1; flashColor = enter ? "#F0306E" : "#3b3d36";
+    for (let i = 0; i < (enter ? 10 : 3); i++) parts.push({ out: true, t: -i * .07, speed: .02, color: flashColor, from: [0, .05, 0], to: [2.4, -.1 + Math.random() * .2, .2] });
+  }
+
+  function frame(ts) {
+    requestAnimationFrame(frame);
+    if (ts - t0 < 33 || !W) return; t0 = ts;
+    if (!dragging) { yaw += reduced ? .0008 : vyaw; vyaw += (.0035 - vyaw) * .02; }
+    for (const s of SIGNALS) act[s] *= .965;
+    flash *= .93;
+    if (!reduced && Math.random() < .04) fire(pick(SIGNALS), Math.random() * .4);
+
+    const n = cols * rows;
+    const zb = new Float32Array(n).fill(1e9), chs = new Array(n), col = new Array(n);
+    const L = [-.45, .6, -.65];
+    for (let i = 0; i < pts.length; i++) {
+      const p = rot(pts[i]), q = proj(p);
+      const cx = q[0] | 0, cy = q[1] | 0;
+      if (cx < 0 || cy < 0 || cx >= cols || cy >= rows) continue;
+      const id = cy * cols + cx;
+      if (q[2] >= zb[id]) continue;
+      zb[id] = q[2];
+      const nn = rot(nrm[i]);
+      let lum = clamp(.18 + .82 * Math.max(0, nn[0] * L[0] + nn[1] * L[1] + nn[2] * L[2]) * .9 + (.6 - (q[2] - 2.2) * .5) * .25);
+      let best = -1, bv = 0, tot = 0;
+      for (let s = 0; s < NS; s++) { const v = pw[i * NS + s] * act[SIGNALS[s]]; tot += v; if (v > bv) { bv = v; best = s; } }
+      lum = clamp(lum + tot * .6 + flash * .25);
+      chs[id] = RAMP[1 + Math.round(lum * (RAMP.length - 2))];
+      if (bv > .12) col[id] = PAL[SIGNALS[best]][Math.min(4, (bv * 5) | 0)];
+      else if (flash > .2 && Math.random() < flash * .5) col[id] = flashColor;
+      else col[id] = GREEN[Math.min(7, (lum * 8) | 0)];
+    }
+    // частицы: входящие сигналы и исходящее решение
+    for (let j = parts.length - 1; j >= 0; j--) {
+      const pa = parts[j];
+      pa.t += pa.speed * (reduced ? 3 : 1);
+      if (pa.t >= 1) {
+        if (!pa.out) act[pa.sig] = Math.min(1.2, act[pa.sig] + pa.power);
+        parts.splice(j, 1); continue;
+      }
+      if (pa.t < 0) continue;
+      const to = pa.out ? pa.to : rot(REG[pa.sig]);
+      const c = pa.out ? [1.2, .5, .2] : [-1.1, to[1] + .6, .4];
+      const draw = (tt, chr, color) => {
+        const u = 1 - tt, p = [0, 1, 2].map((k) => u * u * pa.from[k] + 2 * u * tt * c[k] + tt * tt * to[k]);
+        const q = proj(p), cx = q[0] | 0, cy = q[1] | 0;
+        if (cx < 0 || cy < 0 || cx >= cols || cy >= rows) return;
+        const id = cy * cols + cx; chs[id] = chr; col[id] = color; zb[id] = 0;
+      };
+      const color = pa.out ? pa.color : SIG_COLOR[pa.sig];
+      for (let k = 6; k >= 1; k--) draw(Math.max(0, pa.t - k * .025), k > 3 ? "." : ":", pa.out ? pa.color : PAL[pa.sig][1]);
+      draw(pa.t, pa.out ? "»" : "@", color);
+    }
+    // входные порты слева
+    SIGNALS.forEach((s, k) => {
+      const q = proj([-2.3, .9 - k * .26, .2]), cx = q[0] | 0, cy = q[1] | 0;
+      if (cx >= 0 && cy >= 0 && cx < cols - 2 && cy < rows) { const id = cy * cols + cx; chs[id] = act[s] > .15 ? "◆" : "◇"; col[id] = act[s] > .15 ? SIG_COLOR[s] : "#3b3d36"; }
+    });
+
+    ctx.clearRect(0, 0, W, H);
+    const batches = new Map();
+    for (let id = 0; id < n; id++) {
+      if (!chs[id] || chs[id] === " ") continue;
+      let b = batches.get(col[id]); if (!b) batches.set(col[id], (b = []));
+      b.push(id);
+    }
+    ctx.textBaseline = "top";
+    for (const [c, ids] of batches) {
+      ctx.fillStyle = c;
+      for (const id of ids) ctx.fillText(chs[id], (id % cols) * cw, ((id / cols) | 0) * ch);
+    }
+  }
+  requestAnimationFrame(frame);
+  return { fire, decide, act };
+})();
+</script>
+<script>
+"use strict";
+/* ════════════ панели ════════════ */
+function bar(v, w = 14) { const f = Math.round(clamp(v) * w); return "█".repeat(f) + "░".repeat(w - f); }
+
+function renderSignals(sig, hot = false) {
+  const wts = S.brain.weights;
+  $("sigs").innerHTML = SIGNALS.map((s) => {
+    const v = sig ? sig[s] : 0;
+    return `<div class="sig${hot && v > .6 ? " hot" : ""}"><span class="n">${s}</span><span class="b" style="color:${SIG_COLOR[s]}">${bar(v)}</span><span class="v">${sig ? (v * 100).toFixed(0) : "--"}</span><span class="w">weight ${(+wts[s]).toFixed(2)}</span></div>`;
+  }).join("");
+}
+
+const tokenLink = (sym, addr) => addr ? `<a href="${CONFIG.fomoSite}/tokens/solana/${encodeURIComponent(addr)}" target="_blank" rel="noopener">$${esc(sym)}</a>` : `$${esc(sym)}`;
+function renderRules() {
+  const r = S.rules; if (!r) return;
+  const p = (x) => Math.round(x * 100) + "%";
+  $("rules").innerHTML = [
+    `<li><b>${fmt(r.reserve)} sol</b> reserve is never traded</li>`,
+    `<li>bet size <b>${r.minPos}–${r.maxPos} sol</b>, scaled by conviction</li>`,
+    `<li>max <b>${r.maxOpen}</b> open, max <b>50%</b> of bank in market</li>`,
+    `<li>stop <b>${p(r.stop)}</b>, sell half at <b>+${p(r.tp1)}</b>, rest at <b>+${p(r.tp2)}</b></li>`,
+    `<li>trailing <b>${p(r.trail)}</b> after first take profit</li>`,
+    `<li>3 losses in a row → <b>2h</b> cooldown</li>`,
+    `<li>−${r.dailyLoss} sol in a day → done for the day</li>`,
+    `<li>below <b>${r.halt} sol</b> she stops until a human says go</li>`,
+    `<li>the phone refuses any order above <b>${r.maxPos} sol</b></li>`,
+  ].join("");
+}
+function renderPanels() {
+  renderRules();
+  const b = S.bank;
+  $("barBank").textContent = fmt(b.equity);
+  const pe = $("barPnl"); pe.textContent = pct(b.pnlPct); pe.className = b.pnlPct >= 0 ? "pos" : "neg";
+  $("barGen").textContent = S.brain.generation;
+  $("barMode").textContent = S.live ? `live · ${S.mode || "paper"}` : "demo feed";
+  $("eq").innerHTML = `${fmt(b.equity)}<small>sol</small> <small class="${b.pnlPct >= 0 ? "pos" : "neg"}">${pct(b.pnlPct)}</small>`;
+  // шкала банка: резерв | кэш | в позициях, по 1 символу на ~0.25 sol
+  const w = 30, scale = w / Math.max(b.start * 1.4, b.equity);
+  const r = Math.round(b.reserve * scale), e = Math.round(b.exposure * scale), c = Math.max(0, Math.round((b.cash - b.reserve) * scale));
+  $("meter").innerHTML = `<span class="r">${"▒".repeat(r)}</span>${"█".repeat(c)}<span class="f">${"█".repeat(e)}</span><span class="e">${"░".repeat(Math.max(0, w - r - c - e))}</span>`;
+  $("kStart").textContent = fmt(b.start); $("kCash").textContent = fmt(b.cash); $("kExp").textContent = fmt(b.exposure);
+  $("kRes").textContent = fmt(b.reserve); $("kDay").textContent = sgn(b.dayPnl, 3);
+  $("kTrades").textContent = S.stats.trades || 0; $("kWr").textContent = S.stats.trades ? (S.stats.winrate * 100).toFixed(0) + "%" : "—";
+
+  $("positions").innerHTML = S.positions.length
+    ? `<table><tr><th>token</th><th>size</th><th>pnl</th></tr>${S.positions.map((p) => `<tr><td>${tokenLink(p.symbol, p.address)}${p.tp1Done ? " ½" : ""}</td><td>${fmt(p.sizeSol, 3)}</td><td class="${p.pnlPct >= 0 ? "pos" : "neg"}">${pct(p.pnlPct)}</td></tr>`).join("")}</table>`
+    : `<p class="empty">no open positions. she's waiting.</p>`;
+  $("journal").innerHTML = S.journal.length
+    ? `<table><tr><th>time</th><th>token</th><th>size</th><th>exit</th><th>pnl</th></tr>${S.journal.slice(0, 10).map((t) => `<tr><td>${hhmm(t.closedAt).slice(0, 5)}</td><td>${tokenLink(t.symbol, t.address)}</td><td>${fmt(t.sizeSol, 3)}</td><td>${esc(t.reason)}</td><td class="${t.pnlSol >= 0 ? "pos" : "neg"}">${pct(t.pnlPct)}</td></tr>`).join("")}</table>`
+    : `<p class="empty">no closed trades yet. the first one will show up here with its exit reason.</p>`;
+  const maxW = Math.max(...SIGNALS.map((s) => +S.brain.weights[s]));
+  $("weights").innerHTML = `<p class="empty" style="margin:0 0 8px">generation ${S.brain.generation} · enters at score ${S.brain.threshold}+</p>` +
+    SIGNALS.map((s) => `<div class="wl"><span>${s}</span><span class="b">${"▮".repeat(Math.max(1, Math.round(S.brain.weights[s] / maxW * 16)))}</span><span class="v">${(+S.brain.weights[s]).toFixed(2)}</span></div>`).join("");
+  $("lessons").innerHTML = (S.brain.lessons || []).slice(0, 6).map((l) => `<li>${esc(l.text)}</li>`).join("") || `<li>lessons appear after her first closed trade</li>`;
+}
+
+/* ════════════ данные из мозга ════════════
+   1) live-сервер (CONFIG.liveUrl): всё в реальном времени + экран телефона
+   2) state.json рядом с сайтом: обновляется раз в тик
+   3) ничего нет — демо */
+function applyState(st) {
+  const wasLive = S.live;
+  Object.assign(S, { live: true, mode: st.mode, bank: st.bank || S.bank, positions: st.positions || S.positions, journal: st.journal || S.journal,
+    stats: st.stats || S.stats, brain: st.brain || S.brain, llm: st.llm || S.llm, updatedAt: st.updatedAt || Date.now(), rules: st.rules || S.rules });
+  if (st.episodes) S.episodes = st.episodes;
+  if (st.links) { CONFIG.fomoUrl = st.links.fomo || CONFIG.fomoUrl; CONFIG.fomoSite = st.links.fomoSite || CONFIG.fomoSite; CONFIG.xUrl = st.links.x || CONFIG.xUrl; CONFIG.githubUrl = st.links.github || CONFIG.githubUrl; applyLinks(); }
+  $("updated").textContent = `brain last ticked ${new Date(S.updatedAt).toLocaleString()} · mode ${S.mode} · ${S.llm}`;
+  if (!wasLive) logLine("sys", "connected to her brain — live data");
+  renderPanels();
+}
+
+async function connectLive() {
+  // live-сервер: из CONFIG, из ?live=... в адресе, или тот же хост (если сайт открыт с самого live-сервера)
+  const fromQuery = new URLSearchParams(location.search).get("live");
+  const base = (CONFIG.liveUrl || fromQuery || (location.protocol.startsWith("http") ? location.origin : "")).replace(/\/$/, "");
+  if (!base) return false;
+  try {
+    const r = await fetch(base + "/state", { cache: "no-store" });
+    if (!r.ok || !(r.headers.get("content-type") || "").includes("json")) throw 0;
+    const st = await r.json();
+    if (st.bank) applyState(st);
+    phoneUI.goLive(base);
+    const es = new EventSource(base + "/events");
+    es.onmessage = (m) => {
+      const e = JSON.parse(m.data);
+      if (e.type === "episode") { S.episodes.push(e); S.episodes = S.episodes.slice(-20); }
+      else if (e.type === "state") applyState(e);
+      else if (e.type === "tap" || e.type === "phone-step") phoneUI.onEvent(e);
+      else if (e.type === "learn") logLine("think", e.text);
+      else if (e.type === "error") logLine("money", `error: ${e.text}`);
+      else if (e.type === "buy") logLine("money", `bought $${e.symbol} · ${e.size} sol`);
+      else if (e.type === "exit") logLine("money", `exit $${e.symbol} · ${e.reason} · ${pct(e.pnlPct || 0)}`);
+      else if (e.type === "dry-run") logLine("sys", `dry run: $${e.symbol} ${e.size} sol not confirmed`);
+    };
+    S.liveServer = true;
+    return true;
+  } catch { return false; }
+}
+
+async function poll() {
+  if (S.liveServer) return;
+  try {
+    const r = await fetch(CONFIG.stateUrl + "?t=" + Date.now(), { cache: "no-store" });
+    if (!r.ok) throw 0;
+    const st = await r.json();
+    if (!st || !st.bank) throw 0;
+    applyState(st);
+  } catch { /* нет state.json — остаёмся в демо */ }
+}
+
+function applyLinks() {
+  $("lnkFomo").href = CONFIG.fomoUrl; $("lnkX").href = CONFIG.xUrl; $("lnkGh").href = CONFIG.githubUrl; $("ghBtn").href = CONFIG.githubUrl;
+  $("clone").textContent = `git clone ${CONFIG.githubUrl}`;
+  for (const a of [$("lnkFomo"), $("lnkX"), $("lnkGh"), $("ghBtn")]) { a.target = "_blank"; a.rel = "noopener"; }
+}
+
+/* ════════════ загрузка ════════════ */
+async function boot() {
+  const el = $("boot");
+  const lines = [
+    ["", "fomi-os 0.1 · tty1"], ["d", "mounting brain/ .............. ok"], ["d", "loading 7 signals ............ ok"],
+    ["d", "bank: 5.000 sol · reserve 1.000"], ["d", "risk.rules ................... locked"], ["d", "opening gmgn, x, fomo ........ ok"],
+    ["p", "she's awake."],
+  ];
+  let skip = false; el.onclick = () => (skip = true);
+  addEventListener("keydown", () => (skip = true), { once: true });
+  if (!reduced) for (const [c, t] of lines) {
+    if (skip) break;
+    const d = document.createElement("div"); if (c) d.className = c; el.appendChild(d);
+    for (const ch of t) { if (skip) break; d.textContent += ch; await sleep(9); }
+    await sleep(110);
+  }
+  el.classList.add("gone");
+}
+
+(function init() {
+  $("logo").innerHTML = $("logo").textContent.replace(/[╗╔═║╚╝]+/g, (m) => `<b>${m}</b>`);
+  applyLinks();
+  renderSignals(null);
+  renderPanels();
+  logLine("sys", "fomi online. scanning.");
+  boot().then(async () => {
+    if (!(await connectLive())) {
+      await poll();
+      // сайт на Netlify без live-сервера: экран телефона через функцию /api/phone.jpg (ключи VMOS живут в настройках Netlify)
+      try {
+        const r = await fetch("/api/phone.jpg", { cache: "no-store" });
+        if (r.ok && (r.headers.get("content-type") || "").startsWith("image")) phoneUI.goLive("", "/api/phone.jpg", 2000);
+      } catch { /* нет функции — демо-телефон */ }
+    }
+    director();
+  });
+  setInterval(poll, CONFIG.pollMs);
+})();
+</script>
+</body>
+</html>
