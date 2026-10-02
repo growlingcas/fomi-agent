@@ -224,7 +224,7 @@ footer p{margin:0;max-width:80ch}
 .phone{margin:12px auto 14px;width:min(100%,270px);aspect-ratio:9/19;border:2px solid #34362f;border-radius:26px;padding:12px 8px 16px;background:#050505;position:relative}
 .phone::before{content:"";position:absolute;top:5px;left:50%;width:46px;height:4px;margin-left:-23px;background:#1c1d19;border-radius:2px}
 .phone-screen{position:relative;width:100%;height:100%;overflow:hidden;border-radius:14px;background:#0a0a0a}
-#phoneImg{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000}
+#phoneImg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 0;background:#000}
 .app[hidden]{display:none}
 .taps{position:absolute;inset:0;pointer-events:none}
 .tapdot{position:absolute;width:34px;height:34px;margin:-17px 0 0 -17px;border:2px solid var(--sky);border-radius:50%;animation:tap .7s ease-out forwards}
@@ -735,6 +735,13 @@ const phoneUI = (() => {
     d.style.left = fx * 100 + "%"; d.style.top = fy * 100 + "%";
     taps.appendChild(d); setTimeout(() => d.remove(), 750);
   }
+  // живой экран обрезан под обычную форму телефона: пересчитываем, где показать касание
+  function liveRipple(fx, fy) {
+    const r = img.getBoundingClientRect();
+    if (!img.naturalWidth || !r.width) return ripple(fx, fy);
+    const y = fy * img.naturalHeight * (r.width / img.naturalWidth);
+    if (y <= r.height) ripple(fx, y / r.height);
+  }
   async function tapEl(sel, label) {
     const el = typeof sel === "string" ? app.querySelector(sel) : sel;
     if (label) cap.textContent = label;
@@ -834,14 +841,14 @@ const phoneUI = (() => {
     const load = () => {
       if (document.hidden) return;
       const n = new Image();
-      n.onload = () => { img.src = n.src; if (n.naturalWidth) document.querySelector(".phone").style.aspectRatio = `${n.naturalWidth}/${n.naturalHeight}`; img.hidden = false; app.hidden = true; $("phoneSrc").textContent = "vmos cloud phone · live"; document.querySelector(".phone-status").classList.add("on"); };
+      n.onload = () => { img.src = n.src; img.hidden = false; app.hidden = true; $("phoneSrc").textContent = "vmos cloud phone · live"; document.querySelector(".phone-status").classList.add("on"); };
       n.onerror = () => { img.hidden = true; app.hidden = false; $("phoneSrc").textContent = "phone offline · demo"; document.querySelector(".phone-status").classList.remove("on"); if (!app.innerHTML) feedScreen(); };
       n.src = `${base}${imgPath}?t=${Date.now()}`;
     };
     load(); frameTimer = setInterval(load, every);
   }
   function onEvent(e) {
-    if (e.type === "tap") { ripple(e.fx, e.fy); cap.textContent = e.label || e.step; }
+    if (e.type === "tap") { (img.hidden ? ripple : liveRipple)(e.fx, e.fy); cap.textContent = e.label || e.step; }
     if (e.type === "phone-step") cap.textContent = e.label;
   }
 
