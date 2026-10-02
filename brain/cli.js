@@ -53,6 +53,12 @@ if (cmd === "status") {
     console.log("frame saved to brain/data/phone/ping.jpg", img.length, "bytes");
   } catch (e) { console.error("phone error:", e.message); process.exit(1); }
   process.exit(0);
+} else if (cmd === "phone-resize") {
+  // экран облачного телефона в обычную форму: npm run phone:resize   (вернуть как было: npm run phone:resize -- reset)
+  const { phone } = await import("./phone/index.js");
+  if (!phone.sh) { console.error("works with PHONE_TRANSPORT=vmos"); process.exit(1); }
+  const out = a === "reset" ? await phone.sh("wm size reset; wm density reset; wm size", true) : await phone.sh(`wm size ${a || "1080x2340"}; wm size`, true);
+  console.log(out || "done"); process.exit(0);
 } else if (cmd === "phone-snap") {
   const app = await import("./phone/fomo-app.js");
   await app.snap(); process.exit(0);
