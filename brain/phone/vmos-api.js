@@ -25,16 +25,19 @@ export function sign(sk, ts, path, bodyOrQuery) {
 export async function call(path, body) {
   if (!CFG.phone.vmosAk || !CFG.phone.vmosSk || !pad()) throw new Error("set VMOS_AK, VMOS_SK and VMOS_PAD_CODE in .env");
   const raw = body ? JSON.stringify(body) : "";
-  const ts = Math.floor(Date.now() / 1000).toString();
-  const r = await fetch(BASE + path, {
-    method: "POST",
-    headers: {
-      "X-Access-Key": CFG.phone.vmosAk, "X-Timestamp": ts, "Content-Type": "application/json",
-      "X-Sign": sign(CFG.phone.vmosSk, ts, path, UNSIGNED_BODY.has(path) ? "" : raw),
-    },
-    body: raw,
-  });
-  const j = await r.json().catch(() => ({ code: r.status, msg: "bad json" }));
+  const send = async (signBody) => {
+    const ts = Math.floor(Date.now() / 1000).toString();
+    const r = await fetch(BASE + path, {
+      method: "POST",
+      headers: { "X-Access-Key": CFG.phone.vmosAk, "X-Timestamp": ts, "Content-Type": "application/json",
+        "X-Sign": sign(CFG.phone.vmosSk, ts, path, signBody ? raw : "") },
+      body: raw,
+    });
+    return r.json().catch(() => ({ code: r.status, msg: "bad json" }));
+  };
+  // в документации VMOS расходится, подписывается ли тело у командных методов — пробуем оба варианта
+  let j = await send(!UNSIGNED_BODY.has(path));
+  if (j.code === 2019) j = await send(UNSIGNED_BODY.has(path));
   if (j.code !== 200) throw new Error(`vmos ${path.replace(P, "")}: ${j.code} ${j.msg || ""}`);
   return Array.isArray(j.data) ? j.data[0] : j.data;
 }
