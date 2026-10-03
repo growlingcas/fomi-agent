@@ -1,58 +1,98 @@
 {
-  "_readme": "Карта интерфейса приложения fomo. deepLink — сначала пробуем открыть токен прямо по ссылке fomo.family (если приложение перехватывает такие ссылки); не вышло — идём через поиск. Каждый шаг ищется по text / textContains / desc / id, а если не найден — по xy (доли экрана 0..1). Заполняется после `npm run phone:snap`.",
+  "_readme": "Карта интерфейса fomo (Samsung Galaxy A53 в VMOS, экран 1080x2400). Координаты xy — доли экрана 0..1, сняты вручную в кабинете VMOS. Покупка идёт через Quick Trades (молния справа от главной кнопки): суммы пресетов в долларах настраиваются в шестерёнке. Строки с TODO — снимем после пополнения кошелька.",
   "package": "TODO.fomo.package.name",
+  "screen": {
+    "w": 1080,
+    "h": 2400
+  },
   "deepLink": "https://fomo.family/tokens/solana/{CA}",
   "steps": {
     "home": {
-      "desc": "Home",
       "xy": [
-        0.1,
-        0.95
+        0.173,
+        0.971
       ]
     },
     "openSearch": {
-      "desc": "Search",
       "xy": [
-        0.3,
-        0.95
+        0.338,
+        0.971
       ]
     },
     "searchInput": {
-      "textContains": "Search",
+      "textContains": "Search for anything",
       "xy": [
-        0.5,
-        0.08
+        0.363,
+        0.877
       ]
     },
     "firstResult": {
       "xy": [
-        0.5,
-        0.2
+        0.338,
+        0.168
       ]
     },
     "buyButton": {
       "text": "Buy",
       "xy": [
-        0.3,
-        0.92
+        0.424,
+        0.958
+      ]
+    },
+    "quickTrade": {
+      "xy": [
+        0.892,
+        0.958
+      ]
+    },
+    "quickBuy1": {
+      "xy": [
+        0.305,
+        0.848
+      ]
+    },
+    "quickBuy2": {
+      "xy": [
+        0.566,
+        0.848
+      ]
+    },
+    "quickBuy3": {
+      "xy": [
+        0.829,
+        0.848
+      ]
+    },
+    "quickClose": {
+      "text": "Close",
+      "xy": [
+        0.497,
+        0.956
+      ]
+    },
+    "feedTab": {
+      "text": "Feed",
+      "xy": [
+        0.497,
+        0.597
       ]
     },
     "amountInput": {
-      "textContains": "SOL",
+      "textContains": "TODO",
       "xy": [
         0.5,
         0.4
       ]
     },
     "confirmBuy": {
-      "text": "Confirm",
+      "text": "TODO",
       "xy": [
         0.5,
         0.9
       ]
     },
     "sellButton": {
-      "text": "Sell",
+      "text": "TODO",
       "xy": [
         0.7,
         0.92
@@ -73,21 +113,21 @@
       ]
     },
     "confirmSell": {
-      "text": "Confirm",
+      "text": "TODO",
       "xy": [
         0.5,
         0.9
       ]
     },
     "thesisInput": {
-      "textContains": "thesis",
+      "textContains": "TODO",
       "xy": [
         0.5,
         0.3
       ]
     },
     "postThesis": {
-      "text": "Post",
+      "text": "TODO",
       "xy": [
         0.85,
         0.07
