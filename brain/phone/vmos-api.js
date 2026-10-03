@@ -50,14 +50,10 @@ export async function sh(cmd, wantOutput = false) {
   const deadline = Date.now() + (wantOutput ? 20000 : 8000);
   while (Date.now() < deadline) {
     await wait(600);
-    try {
-      const t = await call(`${P}/executeScriptInfo`, { taskIds: [taskId] });
-      if (t?.taskStatus === 3) return t.taskResult || "";
-      if (t?.taskStatus < 0) throw new Error(`cmd failed: ${t.errorMsg || t.taskStatus}`);
-    } catch (e) {
-      if (String(e.message).startsWith("cmd failed")) throw e;
-      if (!wantOutput) { await wait(CFG.phone.stepDelayMs); return ""; }   // нет статуса — просто ждём
-    }
+    // статус и вывод команды отдаёт padTaskDetail (executeScriptInfo у VMOS не отвечает)
+    const t = await call(`${P}/padTaskDetail`, { taskIds: [taskId] }).catch(() => null);
+    if (t?.taskStatus === 3) return t.taskResult || "";
+    if (t?.taskStatus < 0) throw new Error(`cmd failed: ${t.errorMsg || t.taskStatus}`);
   }
   return "";
 }
