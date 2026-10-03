@@ -57,7 +57,7 @@ async function manageOpen(bank, journal, prices) {
     }
     let res;
     try { res = await exec.sell(bank, pos, ex.pct, t, ex.reason); }
-    catch (e) { pushEvent({ type: "error", text: `sell $${pos.symbol} failed: ${e.message}` }); log("sell failed", e.message); continue; }
+    catch (e) { bank.needSync = true; pushEvent({ type: "error", text: `sell $${pos.symbol} failed: ${e.message}` }); log("sell failed", e.message); continue; }
     if (!res.filled) { log("sell not filled", pos.symbol, ex.reason, res.dry ? "(dry run)" : ""); continue; }
     if (ex.reason === "tp1") pos.tp1Done = true;
     pushEvent({ type: "exit", symbol: pos.symbol, reason: ex.reason, pct: ex.pct, pnlPct: price / pos.entryPrice - 1 });
@@ -179,11 +179,67 @@ async function hunt(bank, journal, brain, prices, paused) {
       bank.lastEntry[t.address] = Date.now();
       if (res.filled || res.order) { bank.entryTimes.push(Date.now()); entered++; }
       if (res.thesisError) pushEvent({ type: "error", text: `thesis for $${t.symbol} failed: ${res.thesisError} — will retry` });
-      if (res.unconfirmed) pushEvent({ type: "error", text: `buy $${t.symbol} $${size} sent but not confirmed on screen — check fomo` });
+      if (res.unconfirmed) {
+        bank.needSync = true;
+        (bank.pendingBuys ||= []).push({ address: t.address, symbol: t.symbol, name: t.gmgn?.name || t.name || "", url: t.url, size,
+          price: priceOf(t), mcap: t.mcap || t.fdv || 0, at: Date.now(), checks: 0, meta: { signals: sig, score: sc, thesis: d.thesis, plan } });
+        bank.entryTimes.push(Date.now()); entered++;
+        pushEvent({ type: "error", text: `buy $${t.symbol} $${size} sent but not confirmed on screen — checking fomo` });
+      }
       pushEvent({ type: res.dry ? "dry-run" : res.filled ? "buy" : res.unconfirmed ? "unconfirmed" : "order", symbol: t.symbol, size, thesis: d.thesis });
       if (res.filled) post(entryTweet(t, size, d.thesis));
     }
   }
+}
+
+// Сверка с fomo: раз в час и сразу после любой неподтверждённой сделки.
+// fomo — источник правды по деньгам: кэш берём оттуда, позиции сопоставляем по тикеру/названию.
+export async function syncWithFomo(bank, journal, force = false) {
+  if (!exec.portfolio) return null;
+  const hourly = Date.now() - (bank.lastSync || 0) > (Number(process.env.SYNC_MINUTES) || 60) * 60e3;
+  if (!force && !hourly && !bank.needSync) return null;
+  let pf;
+  try { pf = await exec.portfolio(); } catch (e) { pushEvent({ type: "error", text: `fomo sync failed: ${e.message}` }); return null; }
+  if (!pf || !Number.isFinite(pf.cash)) { pushEvent({ type: "error", text: "fomo sync: couldn't read the balance" }); return null; }
+  const before = bank.cash;
+  bank.cash = +pf.cash.toFixed(2);
+  bank.lastSync = Date.now(); bank.needSync = false;
+  const norm = (x) => String(x || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const matched = new Set();
+  for (const pos of [...bank.positions]) {
+    const f = pf.positions.find((q, i) => !matched.has(i) && (norm(q.ticker) === norm(pos.symbol) || (pos.name && norm(q.name) === norm(pos.name))));
+    if (f) { matched.add(pf.positions.indexOf(f)); pos.fomoValue = f.value; pos.missing = 0; continue; }
+    pos.missing = (pos.missing || 0) + 1;
+    if (pos.missing >= 2) {                                  // дважды подряд нет в fomo — значит, позиции больше нет
+      const lastValue = pos.fomoValue ?? valueOf(pos, pos.lastPrice || pos.entryPrice);   // точной цены выхода нет — берём последнюю оценку
+      pos.realized = (pos.realized || 0) + lastValue - pos.size * pos.remaining;
+      pushEvent({ type: "error", text: `$${pos.symbol} is no longer in fomo — closing it in my books` });
+      closePosition(bank, journal, pos, "gone from fomo");
+    }
+  }
+  // свайп ушёл, но подтверждения не было: если токен появился в fomo — это наша покупка, берём её в учёт
+  for (const pb of [...(bank.pendingBuys || [])]) {
+    const i = pf.positions.findIndex((q, k) => !matched.has(k) && (norm(q.ticker) === norm(pb.symbol) || (pb.name && norm(q.name) === norm(pb.name))));
+    if (i >= 0) {
+      matched.add(i);
+      const entryPrice = pb.price || 1e-9;
+      bank.positions.push({ id: "p" + Date.now().toString(36), address: pb.address, symbol: pb.symbol, name: pb.name, url: pb.url,
+        entryPrice, entryMcap: pb.mcap, lastPrice: entryPrice, size: pb.size, tokens: (pb.size * (1 - CFG.bank.feePct)) / entryPrice,
+        remaining: 1, peak: entryPrice, tp1Done: false, openedAt: pb.at, via: "phone", thesisPosted: false, thesisTries: 0,
+        fomoValue: pf.positions[i].value, ...pb.meta });
+      bank.pendingBuys = bank.pendingBuys.filter((x) => x !== pb);
+      bank.lastEntry[pb.address] = pb.at;
+      pushEvent({ type: "buy", symbol: pb.symbol, size: pb.size, text: `found $${pb.symbol} in fomo — the buy did go through, tracking it now` });
+    } else if (++pb.checks >= 2) {
+      bank.pendingBuys = bank.pendingBuys.filter((x) => x !== pb);
+      pushEvent({ type: "sync", text: `$${pb.symbol} buy didn't go through — nothing in fomo` });
+    }
+  }
+  bank.external = pf.positions.filter((_, i) => !matched.has(i)).map((q) => ({ name: q.name, ticker: q.ticker, value: q.value, pnlPct: q.pnlPct }));
+  pushEvent({ type: "sync", text: `synced with fomo: cash $${bank.cash.toFixed(2)} (was $${before.toFixed(2)})` +
+    (bank.external.length ? ` · not mine: ${bank.external.map((q) => q.ticker || q.name).join(", ")}` : "") });
+  log(`fomo sync: cash $${before} → $${bank.cash}, untracked ${bank.external.length}`);
+  return pf;
 }
 
 export async function tick() {
@@ -194,6 +250,7 @@ export async function tick() {
   let prices = new Map();
   if (control.mode !== "off") {
     try {
+      await syncWithFomo(bank, journal);
       prices = await market.quotes(bank.positions.map((p) => p.address));
       await manageOpen(bank, journal, prices);
       await hunt(bank, journal, brain, prices, control.mode === "pause");

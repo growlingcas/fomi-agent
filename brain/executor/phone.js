@@ -7,7 +7,7 @@ export async function buy(bank, t, size, meta) {
   const r = await app.buy({ address: t.address, symbol: t.symbol, usd: size, thesis: meta.thesis });
   if (r.dry) return { filled: false, dry: true };
   if (!r.filled) return { filled: false, unconfirmed: r.unconfirmed };
-  const res = await paper.buy(bank, t, size, { ...meta, via: "phone", thesisPosted: !!r.thesisPosted, thesisTries: 1 });
+  const res = await paper.buy(bank, t, size, { ...meta, name: t.gmgn?.name || t.name || "", via: "phone", thesisPosted: !!r.thesisPosted, thesisTries: 1 });
   return { ...res, thesisError: r.thesisPosted ? null : r.thesisError };
 }
 
@@ -22,3 +22,5 @@ export async function sell(bank, pos, pct, t, reason) {
   if (!r.filled) return { filled: false, dry: r.dry, stuck: r.stuck };
   return paper.sell(bank, pos, pct, t);
 }
+
+export const portfolio = () => app.portfolio();

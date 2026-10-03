@@ -1138,9 +1138,11 @@ function renderPanels() {
   $("kRes").textContent = money(b.reserve); $("kDay").textContent = (b.dayPnl >= 0 ? "+" : "") + money(b.dayPnl);
   $("kTrades").textContent = S.stats.trades || 0; $("kWr").textContent = S.stats.trades ? (S.stats.winrate * 100).toFixed(0) + "%" : "—";
 
-  $("positions").innerHTML = S.positions.length
+  $("positions").innerHTML = (S.positions.length
     ? S.positions.map(planCard).join("")
-    : `<p class="empty">no open positions. she's waiting for something worth it.</p>`;
+    : `<p class="empty">no open positions. she's waiting for something worth it.</p>`) +
+    ((S.external || []).length ? `<div class="pm" style="margin-top:10px">also in her fomo wallet, not opened by the brain: ${S.external.map((q) => `$${esc(q.ticker || q.name)} ${money(q.value)}`).join(" · ")}</div>` : "") +
+    (S.lastSync ? `<div class="pm">last checked against fomo ${hhmm(S.lastSync).slice(0, 5)}</div>` : "");
   $("journal").innerHTML = S.journal.length
     ? `<table><tr><th>time</th><th>token</th><th>size</th><th>exit</th><th>pnl</th></tr>${S.journal.slice(0, 10).map((t) => { const pn = t.pnl ?? t.pnlSol ?? 0; return `<tr><td>${hhmm(t.closedAt).slice(0, 5)}</td><td>${tokenLink(t.symbol, t.address)}</td><td>${money(t.size ?? t.sizeSol)}</td><td>${esc(t.reason)}</td><td class="${pn >= 0 ? "pos" : "neg"}">${pct(t.pnlPct)}</td></tr>`; }).join("")}</table>`
     : `<p class="empty">no closed trades yet. the first one will show up here with its exit reason.</p>`;
@@ -1158,7 +1160,7 @@ function applyState(st) {
   const wasLive = S.live;
   Object.assign(S, { live: true, mode: st.mode, bank: st.bank || S.bank, positions: st.positions || S.positions, journal: st.journal || S.journal,
     stats: st.stats || S.stats, brain: st.brain || S.brain, llm: st.llm || S.llm, updatedAt: st.updatedAt || Date.now(), rules: st.rules || S.rules,
-    control: st.control || S.control });
+    control: st.control || S.control, external: st.external || S.external, lastSync: st.lastSync || S.lastSync });
   if (st.episodes) S.episodes = st.episodes;
   if (st.links) { CONFIG.fomoUrl = st.links.fomo || CONFIG.fomoUrl; CONFIG.fomoSite = st.links.fomoSite || CONFIG.fomoSite; CONFIG.xUrl = st.links.x || CONFIG.xUrl; CONFIG.githubUrl = st.links.github || CONFIG.githubUrl; applyLinks(); }
   $("updated").textContent = `brain last ticked ${new Date(S.updatedAt).toLocaleString()} · mode ${S.mode} · ${S.llm}`;
@@ -1187,6 +1189,7 @@ async function connectLive() {
       else if (e.type === "control") { S.control = { mode: e.mode, at: e.at }; logLine("sys", `admin: agent ${e.mode}`); renderPanels(); }
       else if (e.type === "stuck") logLine("money", e.text);
       else if (e.type === "thesis") logLine("voice", e.text);
+      else if (e.type === "sync") logLine("sys", e.text);
       else if (e.type === "error") logLine("money", `error: ${e.text}`);
       else if (e.type === "buy") logLine("money", `bought $${e.symbol} · ${money(e.size)}`);
       else if (e.type === "exit") logLine("money", `exit $${e.symbol} · ${e.reason} · ${pct(e.pnlPct || 0)}`);
@@ -1240,6 +1243,15 @@ async function boot() {
   renderPanels();
   logLine("sys", "fomi online. scanning.");
   boot().then(async () => {
+    // сайт настроен на живой мозг — никакого демо: ждём подключения и пробуем снова
+    if (CONFIG.liveUrl || new URLSearchParams(location.search).get("live")) {
+      while (!(await connectLive())) {
+        $("barMode").textContent = "connecting to her brain…"; $("caption").textContent = "connecting to her brain…";
+        await sleep(5000);
+      }
+      director();
+      return;
+    }
     if (!(await connectLive())) {
       await poll();
       // сайт на Netlify без live-сервера: экран телефона через функцию /api/phone.jpg (ключи VMOS живут в настройках Netlify)

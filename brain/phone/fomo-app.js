@@ -17,7 +17,7 @@ import { CFG } from "../config.js";
 import { phone } from "./index.js";
 import { emit } from "../bus.js";
 import { getControl } from "../control.js";
-import { look } from "./vision.js";
+import { look, readPortfolio } from "./vision.js";
 
 const UI = JSON.parse(fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "fomo-ui.json"), "utf8"));
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -39,7 +39,8 @@ async function screen() {
 }
 async function bail(why) {
   emit("phone-step", { label: `${why} — backing out` });
-  await phone.back().catch(() => {}); await wait(800); await phone.back().catch(() => {});
+  await phone.back().catch(() => {}); await wait(800);
+  await phone.openApp(UI.package).catch(() => {});          // назад в fomo, а не в Play Store
   throw new Error(`${why} — aborted`);
 }
 
@@ -150,12 +151,16 @@ export async function buy({ address, symbol, usd, thesis }) {
   await swipe(UI.slideBuy, `slide to buy $${amt}`);
   await wait(6500);
   // подтверждение: после покупки на странице токена должна появиться «Your position»
-  const after = await screen();
-  let confirmed = after.all.includes("your position");
-  if (!confirmed) {
-    const jpg = await phone.screenshot().catch(() => null);
-    const v = jpg && await look(jpg, `Expected: token page for ${symbol} that now shows a "Your position" block with a dollar value. Set ok=true only if that block is visible.`);
-    confirmed = !!v?.ok;
+  let confirmed = false;
+  for (let attempt = 0; attempt < 2 && !confirmed; attempt++) {
+    if (attempt) await wait(6000);
+    const after = await screen().catch(() => ({ all: "" }));
+    confirmed = /your position|update thesis|add thesis|bought|order (filled|complete)/.test(after.all);
+    if (!confirmed) {
+      const jpg = await phone.screenshot().catch(() => null);
+      const v = jpg && await look(jpg, `A buy of ${symbol} was just submitted. ok=true if the screen shows a "Your position" block, an "Add thesis" link, or a purchase success message for ${symbol}.`);
+      confirmed = !!v?.ok;
+    }
   }
   if (!confirmed) {
     emit("phone-step", { label: `can't confirm the $${symbol} buy — check fomo` });
@@ -222,6 +227,31 @@ export async function sell({ address, symbol, pct }) {
   await wait(6000);
   emit("phone-step", { label: `sold ${pct >= 0.99 ? "all" : "half"} of $${symbol}` });
   return { filled: true };
+}
+
+// Сверка с fomo: вкладка профиля → «Total cash» и список позиций
+export async function portfolio() {
+  guard();
+  emit("phone-step", { label: "checking my fomo balance" });
+  await phone.openApp(UI.package);
+  await wait(3000);
+  await tapStep("navProfile", "profile");
+  await wait(4000);
+  const s = await screen();
+  const jpg = await phone.screenshot().catch(() => null);
+  const v = jpg ? await readPortfolio(jpg) : null;
+  // кэш из текста интерфейса надёжнее, если Android его отдал
+  const texts = s.nodes.map((n) => n.text).filter(Boolean);
+  const i = texts.findIndex((t) => /total cash/i.test(t));
+  const uiCash = i >= 0 ? Number((texts.slice(i + 1).find((t) => /^\$[\d,.]+$/.test(t)) || "").replace(/[$,]/g, "")) : NaN;
+  await tapStep("navHome", "home").catch(() => {});
+  if (!v?.ok && !Number.isFinite(uiCash)) return null;
+  return {
+    cash: Number.isFinite(uiCash) && uiCash > 0 ? uiCash : Number(v?.cash),
+    total: Number(v?.total) || null,
+    positions: (v?.positions || []).map((p) => ({ name: String(p.name || ""), ticker: String(p.ticker || "").replace(/^\$/, "").toUpperCase(),
+      value: Number(p.value) || 0, pnlPct: Number(p.pnlPct) || 0 })),
+  };
 }
 
 // Калибровка: сохранить скриншот и все элементы экрана

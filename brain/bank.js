@@ -24,7 +24,8 @@ export const saveBank = (b) => save("bank", b);
 
 export const valueOf = (pos, price) => pos.tokens * pos.remaining * price;
 export function equity(b, prices = new Map()) {
-  return b.cash + b.positions.reduce((s, p) => s + valueOf(p, priceOf(prices.get(p.address)) || p.lastPrice || p.entryPrice) * (1 - CFG.bank.feePct), 0);
+  return b.cash + b.positions.reduce((s, p) => s + valueOf(p, priceOf(prices.get(p.address)) || p.lastPrice || p.entryPrice) * (1 - CFG.bank.feePct), 0)
+    + (b.external || []).reduce((s, q) => s + (q.value || 0), 0);
 }
 export function exposure(b) {
   const pending = (b.orders || []).filter((o) => o.side === "buy").reduce((s, o) => s + o.size, 0);

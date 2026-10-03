@@ -21,7 +21,7 @@ export function publish(bank, brain, journal, prices, control = { mode: "on" }) 
       symbol: p.symbol, address: p.address, url: p.url, size: r2(p.size), remaining: +p.remaining.toFixed(2),
       value: r2(p.tokens * p.remaining * px), pnlPct: +(px / p.entryPrice - 1).toFixed(4), openedAt: p.openedAt,
       entryMcap: r2(p.entryMcap), mcap: r2(mcNow), tp1Done: p.tp1Done, thesis: p.thesis, score: p.score,
-      note: p.plan?.note || "",
+      note: p.plan?.note || "", fomoValue: p.fomoValue ?? null,
       plan: {
         sl: { pct: +(L.sl / p.entryPrice - 1).toFixed(3), mcap: mcAt(L.sl) },
         tp1: { pct: CFG.exits.tp1, mcap: mcAt(L.tp1), done: p.tp1Done },
@@ -42,6 +42,8 @@ export function publish(bank, brain, journal, prices, control = { mode: "on" }) 
       dayPnl: r2(bank.day.pnl), halted: bank.halted, pausedUntil: bank.pausedUntil, entriesLastHour: entriesLastHour(bank),
     },
     positions,
+    external: bank.external || [],
+    lastSync: bank.lastSync || 0,
     orders: bank.orders,
     journal: journal.slice(-30).reverse().map((t) => ({ symbol: t.symbol, address: t.address, size: t.size ?? t.sizeSol,
       pnl: t.pnl ?? t.pnlSol, pnlPct: t.pnlPct, reason: t.reason, openedAt: t.openedAt, closedAt: t.closedAt, thesis: t.thesis })),
@@ -59,7 +61,7 @@ export function publish(bank, brain, journal, prices, control = { mode: "on" }) 
   fs.mkdirSync(path.dirname(CFG.paths.state), { recursive: true });
   fs.writeFileSync(CFG.paths.state, JSON.stringify(state));
   lastState = state;
-  emit("state", { bank: state.bank, positions, stats: st, brain: state.brain, journal: state.journal, rules: state.rules,
+  emit("state", { bank: state.bank, positions, external: state.external, lastSync: state.lastSync, stats: st, brain: state.brain, journal: state.journal, rules: state.rules,
     mode: state.mode, control: state.control, unit: "usd" });
   return state;
 }

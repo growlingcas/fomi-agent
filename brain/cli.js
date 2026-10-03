@@ -58,6 +58,11 @@ if (cmd === "status") {
   }
   bank.orders = bank.orders.filter((x) => x.id !== o.id);
   console.log("confirmed", o.id);
+} else if (cmd === "sync") {
+  // сверка с fomo прямо сейчас: кэш и позиции
+  const { syncWithFomo } = await import("./index.js");
+  const pf = await syncWithFomo(bank, journal, true);
+  console.log(pf ? { cash: bank.cash, positions: pf.positions, mine: bank.positions.map((p) => p.symbol), notMine: bank.external } : "sync failed — see events");
 } else if (cmd === "phone-ping") {
   const { phone } = await import("./phone/index.js");
   try {
@@ -102,7 +107,7 @@ if (cmd === "status") {
   for (const f of ["bank", "journal", "events", "episodes", "brain", "outbox", "mock_world"]) fs.rmSync(`${CFG.paths.data}/${f}.json`, { force: true });
   console.log("reset to $" + CFG.bank.start); done();
 } else {
-  console.log("commands: admin [status|on|pause|off] | status | confirm <orderId> [price] | resume | reset | stop | unstop | phone-ping | phone-snap | phone-debug | phone-resize | phone-test <CA> <TICKER> [usd]");
+  console.log("commands: admin [status|on|pause|off] | status | sync | confirm <orderId> [price] | resume | reset | stop | unstop | phone-ping | phone-snap | phone-debug | phone-resize | phone-test <CA> <TICKER> [usd]");
   done();
 }
 saveBank(bank); saveJournal(journal);
