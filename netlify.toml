@@ -3,3 +3,5 @@
   publish = "docs"
   command = ""
   functions = "netlify/functions"
+  # пересобирать только когда меняется сам сайт или функции — правки мозга кредиты не тратят
+  ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- docs/ netlify/"
