@@ -23,8 +23,9 @@ const num = (v) => (v === undefined || v === null || v === "" ? null : Number(v)
 
 // Трендовые токены Solana за час, без wash trading
 export async function trending() {
+  const pump = CFG.filters.pumpFunOnly ? ["--platform", "Pump.fun", "--platform", "pump_mayhem", "--platform", "pump_agent", "--platform", "pump_mayhem_agent"] : [];
   const j = await cli(["market", "trending", "--chain", "sol", "--interval", "1h", "--order-by", "volume",
-    "--limit", "60", "--filter", "not_wash_trading"]);
+    "--limit", "60", "--filter", "not_wash_trading", ...pump]);
   const list = j?.rank || j?.data?.rank || (Array.isArray(j) ? j : []);
   return list.map((t) => ({
     address: t.address,
@@ -39,6 +40,11 @@ export async function trending() {
       devHolds: t.creator_token_status === "creator_hold",
       mintRenounced: num(t.renounced_mint) === 1, freezeRenounced: num(t.renounced_freeze_account) === 1,
       platform: t.launchpad_platform || "", created: num(t.creation_timestamp),
+      twitter: t.twitter_username || "", website: t.website || "", telegram: t.telegram || "",
+      socialReuse: num(t.twitter_create_token_count) || 0, socialDeletes: num(t.twitter_del_post_token_count) || 0,
+      websiteDup: num(t.website_dup) || 0, twitterDup: num(t.twitter_dup) || 0, cto: num(t.cto_flag) === 1,
+      botRate: num(t.bot_degen_rate), entrapment: num(t.entrapment_ratio), live: t.is_token_live === true,
+      name: t.name || "",
     },
   })).filter((t) => t.address);
 }

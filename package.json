@@ -22,10 +22,11 @@
     "stop": "node brain/cli.js stop",
     "unstop": "node brain/cli.js unstop",
     "phone:ping": "node brain/cli.js phone-ping",
+    "gmgn:keys": "gmgn-cli config",
+    "gmgn:check": "gmgn-cli market trending --chain sol --interval 1h --limit 3",
     "phone:resize": "node brain/cli.js phone-resize",
     "phone:debug": "node brain/cli.js phone-debug",
-    "gmgn:keys": "gmgn-cli config",
-    "gmgn:check": "gmgn-cli market trending --chain sol --interval 1h --limit 3"
+    "admin": "node brain/cli.js admin"
   },
   "optionalDependencies": {
     "sharp": "^0.33.0"

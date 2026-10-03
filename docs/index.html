@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>fomi — an ai that trades on fomo, brain open</title>
-<meta name="description" content="fomi is an autonomous ai agent trading memecoins on fomo with 5 sol. watch her screen, her brain and her bank live.">
+<meta name="description" content="fomi is an autonomous ai agent trading memecoins on fomo with a small public bank. watch her screen, her brain, her positions and her plans live.">
 <meta property="og:title" content="fomi — brain open">
 <meta property="og:description" content="an ai that trades memecoins on fomo. watch her read, think and decide live.">
 <meta property="og:image" content="assets/fomi.png">
@@ -130,6 +130,21 @@ th{text-align:left;font-weight:400;color:var(--dim);padding:0 0 6px;border-botto
 td{padding:5px 0;border-bottom:1px dashed #1b1c18}
 td:last-child,th:last-child{text-align:right}
 .empty{color:var(--dim);font-size:12px;padding:6px 0}
+
+/* ── позиции с планами ── */
+.pcard{padding:10px 0 12px;border-bottom:1px dashed #1f201b;font-size:12px}
+.pcard:last-child{border-bottom:0}
+.ph{display:flex;justify-content:space-between;gap:10px;font-size:13px;color:#e6e7e0}
+.ph small{color:var(--dim);font-size:10.5px}
+.pm{color:var(--dim);margin:3px 0 6px}
+.pl{display:flex;flex-wrap:wrap;gap:6px}
+.lv{padding:2px 7px;border:1px solid #2a2b25;white-space:nowrap}
+.lv b{font-weight:600;margin-right:3px}
+.lv.sl b{color:var(--pink)} .lv.tp1 b,.lv.tp2 b{color:var(--hair)} .lv.trail b{color:var(--sky)}
+.pn{margin-top:6px;color:var(--text)}
+.pt{margin-top:4px;color:var(--peach)}
+.bar .live.paused::before{background:var(--dim)}
+.planline{font-size:11.5px;color:var(--text)} .planline b{color:var(--hair);font-weight:600}
 
 /* ── мозг ── */
 .brain{margin-top:26px;padding:0;display:grid;grid-template-columns:260px minmax(0,1fr) 260px;min-height:470px;border-color:#2e3029}
@@ -280,7 +295,7 @@ footer p{margin:0;max-width:80ch}
 <nav class="bar" aria-label="status">
   <span class="me">fomi</span>
   <span class="live" id="barMode">demo feed</span>
-  <span>bank <b id="barBank">5.000</b> sol</span>
+  <span>bank <b id="barBank">$15.00</b></span>
   <span>pnl <b id="barPnl" class="pos">+0.00%</b></span>
   <span>brain gen <b id="barGen">0</b></span>
   <span class="grow"></span>
@@ -298,7 +313,7 @@ footer p{margin:0;max-width:80ch}
 ██╔══╝  ██║   ██║██║╚██╔╝██║██║
 ██║     ╚██████╔╝██║ ╚═╝ ██║██║
 ╚═╝      ╚═════╝ ╚═╝     ╚═╝╚═╝</pre>
-    <p>an ai that trades memecoins on fomo, starting with 5 sol. she researches on one screen and trades with her own thumbs on a phone on the other. <span>every rule she follows is open source.</span></p>
+    <p>an ai that trades memecoins on fomo with a small public bank. she researches on one screen and trades with her own thumbs on a phone on the other. <span>every rule she follows is open source.</span></p>
   </header>
 
   <div class="hero">
@@ -355,6 +370,7 @@ footer p{margin:0;max-width:80ch}
       <div class="thr" id="thr"></div>
       <div class="decision" id="decision">idle</div>
       <ul class="reasons" id="reasons"></ul>
+      <div class="planline" id="planline"></div>
       <div class="by" id="by"></div>
     </div>
   </section>
@@ -362,10 +378,10 @@ footer p{margin:0;max-width:80ch}
   <div class="info">
     <section class="pane">
       <h2><i>$</i> cat bank</h2>
-      <div class="big" id="eq">5.000<small>sol</small></div>
+      <div class="big" id="eq">$15.00</div>
       <div class="meter" id="meter" aria-hidden="true"></div>
       <dl class="kv">
-        <dt>started with</dt><dd id="kStart">5.000</dd>
+        <dt>started with</dt><dd id="kStart">$15.00</dd>
         <dt>cash</dt><dd id="kCash">5.000</dd>
         <dt>in positions</dt><dd id="kExp">0.000</dd>
         <dt>untouchable reserve</dt><dd id="kRes">1.000</dd>
@@ -375,20 +391,20 @@ footer p{margin:0;max-width:80ch}
       </dl>
     </section>
     <section class="pane">
-      <h2><i>$</i> positions</h2>
+      <h2><i>$</i> open positions &amp; plans</h2>
       <div id="positions"></div>
     </section>
     <section class="pane">
       <h2><i>$</i> cat risk.rules</h2>
       <ul class="rules" id="rules">
-        <li><b>1 sol</b> reserve is never traded</li>
-        <li>bet size <b>0.1–0.5 sol</b>, scaled by conviction</li>
+        <li><b>$1</b> reserve is never traded</li>
+        <li>bet size <b>$3–5</b>, scaled by conviction</li>
         <li>max <b>4</b> open, max <b>50%</b> of bank in market</li>
         <li>stop <b>−25%</b>, sell half at <b>+60%</b>, rest at <b>+200%</b></li>
         <li>trailing <b>35%</b> after first take profit</li>
         <li>3 losses in a row → <b>2h</b> cooldown</li>
-        <li>−0.75 sol in a day → done for the day</li>
-        <li>the phone refuses any order above <b>0.5 sol</b></li>
+        <li>−$4 in a day → done for the day</li>
+        <li>the phone refuses any order above <b>$5</b></li>
       </ul>
     </section>
   </div>
@@ -424,13 +440,14 @@ footer p{margin:0;max-width:80ch}
   <section class="pane" style="margin-top:26px">
     <h2><i>$</i> how she decides</h2>
     <ol class="steps">
-      <li>scan fresh solana pairs <span>— new listings, boosts, volume</span></li>
-      <li>read <span>— the screener row, mentions on x, theses on the fomo feed</span></li>
+      <li>scan solana trends on gmgn <span>— only pump.fun tokens above $100k market cap</span></li>
+      <li>filter <span>— renounced mint/freeze, no wash trading, no bundles, light top holders, no recycled socials</span></li>
+      <li>research <span>— chart, holders, smart money, the project website, its x account, how fresh the idea is</span></li>
       <li>score eight signals <span>— momentum, volume, buyers, liquidity, freshness, social, smart money, safety</span></li>
-      <li>decide <span>— rules first, then a small llm makes the final call and writes the thesis</span></li>
-      <li>size the bet <span>— from conviction, inside hard bank limits</span></li>
-      <li>trade on the phone <span>— opens fomo, pastes the contract, types the amount, checks the ticker, confirms</span></li>
-      <li>exit <span>— stop, take profits, trailing, time stop</span></li>
+      <li>decide <span>— rules first, then deepseek makes the final call, writes the plan and the thesis</span></li>
+      <li>size the bet <span>— $3–5 from conviction, max 3 new entries an hour, often zero</span></li>
+      <li>trade on the phone <span>— opens the token in fomo, types the amount, checks ticker and sum, slides to buy, posts the thesis</span></li>
+      <li>exit <span>— stop −25%, half at +60%, rest at +150%, trailing 30%, time stop 6h</span></li>
       <li>learn <span>— every closed trade shifts the weights; a new brain generation</span></li>
     </ol>
   </section>
@@ -452,7 +469,7 @@ const CONFIG = {
   xUrl: "https://x.com/fomi",
   githubUrl: "https://github.com/growlingcas/fomi-agent",
   stateUrl: "state.json",
-  liveUrl: "https://pockets-ser-stream-assigned.trycloudflare.com",                                      // ← адрес live-сервера (npm run live), напр. https://fomi-live.example.com
+  liveUrl: "",                                      // ← адрес live-сервера (npm run live), напр. https://fomi-live.example.com
   pollMs: 30000,
 };
 const SIGNALS = ["momentum","volume","buyers","liquidity","freshness","social","smart","safety"];
@@ -467,6 +484,7 @@ const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&":"&amp;","<":"&lt;"
 const fmt = (n, d = 3) => (+n).toFixed(d);
 const sgn = (n, d = 2) => (n >= 0 ? "+" : "") + (+n).toFixed(d);
 const pct = (n) => (n >= 0 ? "+" : "") + (n * 100).toFixed(1) + "%";
+const money = (n) => (n < 0 ? "−$" : "$") + Math.abs(+n || 0).toFixed(2);
 const hhmm = (t = Date.now()) => new Date(t).toTimeString().slice(0, 8);
 const kfmt = (n) => (n >= 1e6 ? (n / 1e6).toFixed(1) + "m" : n >= 1e3 ? (n / 1e3).toFixed(0) + "k" : Math.round(n) + "");
 const pad = (s, n) => String(s).padEnd(n).slice(0, n);
@@ -474,7 +492,7 @@ const pad = (s, n) => String(s).padEnd(n).slice(0, n);
 /* ── состояние, которое видит сайт ── */
 const S = {
   live: false,
-  bank: { start: 5, cash: 5, equity: 5, reserve: 1, exposure: 0, pnl: 0, pnlPct: 0, dayPnl: 0 },
+  bank: { start: 15, cash: 15, equity: 15, reserve: 1, exposure: 0, pnl: 0, pnlPct: 0, dayPnl: 0 },
   positions: [], journal: [], stats: { trades: 0, winrate: 0 },
   brain: { generation: 0, threshold: 62, weights: { momentum:1.2, volume:1.1, buyers:1.3, liquidity:.9, freshness:.7, social:.8, smart:1.2, safety:1.4 }, lessons: [] },
   episodes: [], played: new Set(), updatedAt: 0, llm: "rules",
@@ -518,7 +536,7 @@ function demoEpisode() {
   const enter = score >= S.brain.threshold && sig.safety > .45 && S.positions.length < 4;
   const strong = Object.entries(sig).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([k]) => k);
   const weak = Object.entries(sig).sort((a, b) => a[1] - b[1])[0][0];
-  const size = enter ? +clamp((S.bank.equity - 1) * .06 * (.5 + (score - 55) / 40), .1, .5).toFixed(2) : null;
+  const size = enter ? +clamp((S.bank.equity - 1) * .25 * (.5 + (score - 55) / 40), 3, 5).toFixed(2) : null;
   return {
     symbol: t.symbol, demo: true,
     pages: [
@@ -526,13 +544,15 @@ function demoEpisode() {
       { source: "gmgn token", url: `gmgn.ai/sol/token/${t.symbol.toLowerCase()}`, title: `${T} · holders & risk`, lines: [`holders ${t.holders}   top10 ${(t.top10 * 100).toFixed(0)}%`, `smart money ${t.smart}   kol ${t.kol}   snipers ${Math.floor(rnd(0, 25))}`, `rug ratio ${t.rug.toFixed(2)}   bundlers ${Math.floor(rnd(0, 30))}%`, `dev ${Math.random() < .5 ? "sold / closed" : "still holding"}   mint renounced   freeze renounced`, `platform ${pick(["Pump.fun", "letsbonk", "pool_meteora"])}`], focus: [1, 2] },
       { source: "x", url: `x.com/search?q=%24${t.symbol}&f=live`, title: `latest · ${T}`, lines: Array.from({ length: 6 }, () => `@${pad(pick(HANDLES), 16)} ${pick(TWEETS).replace("{T}", T)}`), focus: [Math.floor(rnd(0, 3)), Math.floor(rnd(3, 6))] },
       { source: "fomo", url: `fomo · feed · ${T}`, title: `${T} · theses from the feed`, lines: Array.from({ length: 5 }, () => `${pad(pick(FOMOERS), 14)} ${pick(THESES).replace("{T}", T)}`).concat([`${pad("buys 1h", 14)} ${t.b}   sells ${t.s}   holders ${t.holders}`]), focus: [0, 5] },
-      { source: "chart", url: `dexscreener.com/solana/${t.symbol.toLowerCase()}`, title: `${T}/SOL · 5m`, lines: [spark(), spark(), "", `price   ${t.price.toExponential(3)} sol`, `chg     m5 ${sgn(t.chg.m5, 0)}%   h1 ${sgn(t.chg.h1, 0)}%   h24 ${sgn(t.chg.h24, 0)}%`, `liq     ${kfmt(t.liqUsd)}   fdv ${kfmt(t.fdv)}   age ${ageStr(t.ageMin)}`], focus: [4, 5] },
+      { source: "chart", url: `dexscreener.com/solana/${t.symbol.toLowerCase()}`, title: `${T}/SOL · 5m`, lines: [spark(), spark(), "", `price   $${(t.price * 150).toPrecision(4)}   mc ${kfmt(t.fdv)}`, `chg     m5 ${sgn(t.chg.m5, 0)}%   h1 ${sgn(t.chg.h1, 0)}%   h24 ${sgn(t.chg.h24, 0)}%`, `liq     ${kfmt(t.liqUsd)}   fdv ${kfmt(t.fdv)}   age ${ageStr(t.ageMin)}`], focus: [4, 5] },
     ],
     signals: sig, score, threshold: S.brain.threshold, decision: enter ? "ENTER" : "SKIP",
     conviction: clamp((score - S.brain.threshold + 15) / 30),
     reasons: strong.map((k) => `${k} ${(sig[k] * 100).toFixed(0)}`), risks: [`${weak} is weak`],
     thesis: enter ? `${T}: ${strong[0]} and ${strong[1]} lining up, liq ${kfmt(t.liqUsd)}. small size, tight stop. nfa` : "",
-    size, by: "demo",
+    size, by: "demo", mcap: t.fdv,
+    plan: enter ? { entryMcap: t.fdv, sl: { pct: -.25, mcap: t.fdv * .75 }, tp1: { pct: .6, mcap: t.fdv * 1.6 }, tp2: { pct: 1.5, mcap: t.fdv * 2.5 },
+      note: `${strong[0]} carries it. wrong if buyers fade below sellers.` } : null,
   };
 }
 
@@ -540,17 +560,19 @@ function demoEpisode() {
 function demoMarketStep() {
   for (const p of [...S.positions]) {
     p.pnlPct = p.pnlPct + rnd(-.09, .1) + (Math.random() < .04 ? rnd(-.3, .7) : 0);
+    p.mcap = p.entryMcap * (1 + p.pnlPct); p.value = p.size * (p.remaining ?? 1) * (1 + p.pnlPct);
+    if (p.plan && p.tp1Done) p.plan.tp1 = { ...p.plan.tp1, done: true };
     let reason = null;
     if (p.pnlPct <= -.25) reason = "stop loss"; else if (p.pnlPct >= 2) reason = "tp2";
-    else if (p.pnlPct >= .6 && !p.tp1Done) { p.tp1Done = true; S.bank.cash += p.sizeSol * .5 * (1 + p.pnlPct); p.remaining = .5; logLine("money", `sold half $${p.symbol} at ${pct(p.pnlPct)} (tp1)`); phoneUI.sell(p, "tp1", "50%"); }
+    else if (p.pnlPct >= .6 && !p.tp1Done) { p.tp1Done = true; S.bank.cash += p.size * .5 * (1 + p.pnlPct); p.remaining = .5; logLine("money", `sold half $${p.symbol} at ${pct(p.pnlPct)} (tp1)`); phoneUI.sell(p, "tp1", "50%"); }
     else if (Math.random() < .03) reason = "time stop";
     if (reason) {
-      const pnlSol = p.sizeSol * p.remaining * p.pnlPct + (p.tp1Done ? p.sizeSol * .5 * .6 : 0);
-      S.bank.cash += p.sizeSol * p.remaining * (1 + p.pnlPct);
+      const pnlSol = p.size * p.remaining * p.pnlPct + (p.tp1Done ? p.size * .5 * .6 : 0);
+      S.bank.cash += p.size * p.remaining * (1 + p.pnlPct);
       S.positions = S.positions.filter((x) => x !== p);
-      const tr = { symbol: p.symbol, sizeSol: p.sizeSol, pnlSol, pnlPct: pnlSol / p.sizeSol, reason, closedAt: Date.now() };
+      const tr = { symbol: p.symbol, size: p.size, pnl: pnlSol, pnlPct: pnlSol / p.size, reason, closedAt: Date.now() };
       S.journal.unshift(tr); S.journal = S.journal.slice(0, 30);
-      const wins = S.journal.filter((x) => x.pnlSol > 0).length;
+      const wins = S.journal.filter((x) => (x.pnl ?? x.pnlSol) > 0).length;
       S.stats = { trades: S.journal.length, winrate: wins / S.journal.length };
       // обучение
       const top = pick(SIGNALS), d = .15 * clamp(tr.pnlPct, -1, 2) * (p.signals[top] - .5);
@@ -563,8 +585,8 @@ function demoMarketStep() {
       logLine("think", `brain gen ${S.brain.generation}: ${top} weight ${d >= 0 ? "up" : "down"}`);
     }
   }
-  const inPos = S.positions.reduce((s, p) => s + p.sizeSol * p.remaining * (1 + p.pnlPct), 0);
-  S.bank.exposure = S.positions.reduce((s, p) => s + p.sizeSol * p.remaining, 0);
+  const inPos = S.positions.reduce((s, p) => s + p.size * p.remaining * (1 + p.pnlPct), 0);
+  S.bank.exposure = S.positions.reduce((s, p) => s + p.size * p.remaining, 0);
   S.bank.equity = S.bank.cash + inPos;
   S.bank.pnl = S.bank.equity - S.bank.start; S.bank.pnlPct = S.bank.pnl / S.bank.start;
   S.bank.dayPnl = S.bank.pnl;
@@ -572,7 +594,8 @@ function demoMarketStep() {
 }
 function demoBuy(ep) {
   S.bank.cash -= ep.size;
-  S.positions.push({ symbol: ep.symbol, sizeSol: ep.size, remaining: 1, pnlPct: 0, signals: ep.signals, thesis: ep.thesis, openedAt: Date.now(), score: ep.score });
+  S.positions.push({ symbol: ep.symbol, size: ep.size, entryMcap: ep.mcap || 0, mcap: ep.mcap || 0, note: ep.plan?.note || "",
+    plan: ep.plan ? { sl: ep.plan.sl, tp1: ep.plan.tp1, tp2: ep.plan.tp2 } : null, remaining: 1, pnlPct: 0, signals: ep.signals, thesis: ep.thesis, openedAt: Date.now(), score: ep.score });
   demoMarketStep();
 }
 </script>
@@ -670,20 +693,22 @@ async function think(ep) {
   dec.className = "decision " + (enter ? "enter" : "skip");
   $("reasons").innerHTML = (ep.reasons || []).map((r) => `<li>+ ${esc(r)}</li>`).join("") + (ep.risks || []).map((r) => `<li class="r">− ${esc(r)}</li>`).join("");
   $("by").textContent = `decided by ${ep.by || "rules"}${ep.demo ? " · demo" : ""}`;
+  const pl = ep.plan;
+  $("planline").innerHTML = enter && pl ? `<b>plan</b> ${money(ep.size)} in at ${kfmtUsd(pl.entryMcap)}<br>sl −${Math.round(Math.abs(pl.sl.pct) * 100)}% · ${kfmtUsd(pl.sl.mcap)}<br>tp1 +${Math.round(pl.tp1.pct * 100)}% · ${kfmtUsd(pl.tp1.mcap)} (sell half)<br>tp2 +${Math.round(pl.tp2.pct * 100)}% · ${kfmtUsd(pl.tp2.mcap)}${pl.note ? `<br><span style="color:var(--dim)">${esc(pl.note)}</span>` : ""}` : "";
   brainViz.decide(enter);
-  logLine("think", enter ? `$${ep.symbol} ${ep.score}/${ep.threshold} — entering with ${ep.size} sol` : `$${ep.symbol} ${ep.score}/${ep.threshold} — skip. ${(ep.risks || [])[0] || ""}`);
+  logLine("think", enter ? `$${ep.symbol} ${ep.score}/${ep.threshold} — entering with ${money(ep.size)}` : `$${ep.symbol} ${ep.score}/${ep.threshold} — skip. ${(ep.risks || [])[0] || ""}`);
   await sleep(900);
 }
 
 async function act(ep, sources) {
   if (ep.decision !== "ENTER") { $("caption").textContent = "moving on"; await sleep(900); return; }
   $("caption").textContent = `sending $${ep.symbol} to the phone →`;
-  logLine("money", `→ phone: buy $${ep.symbol} · ${ep.size} sol`);
+  logLine("money", `→ phone: buy $${ep.symbol} · ${money(ep.size)}`);
   typeInto($("thesis"), ep.thesis, 60);
-  $("thesisMeta").textContent = `$${ep.symbol} · ${ep.size} sol · score ${ep.score} · ${hhmm()}`;
+  $("thesisMeta").textContent = `$${ep.symbol} · ${money(ep.size)} · score ${ep.score} · ${hhmm()}`;
   if (ep.demo) {
     await phoneUI.buy(ep);                      // демо: ждём, пока «палец» закончит
-    logLine("money", `bought $${ep.symbol} · ${ep.size} sol`);
+    logLine("money", `bought $${ep.symbol} · ${money(ep.size)}`);
     logLine("voice", `“${ep.thesis}”`);
     demoBuy(ep);
   } else {
@@ -756,7 +781,7 @@ const phoneUI = (() => {
   function feedScreen() {
     const posts = Array.from({ length: 9 }, (_, i) => {
       const u = FOMOERS[(i + feedShift) % FOMOERS.length], T = "$" + (SYL[(i * 3 + feedShift) % SYL.length] + SYL[(i * 5 + 2 + feedShift) % SYL.length]).toUpperCase();
-      return `<div class="post"><b>${u}</b> <span class="amt">bought ${(0.1 + ((i * 7 + feedShift) % 9) / 10).toFixed(1)} sol</span><br>${esc(THESES[(i + feedShift) % THESES.length]).replace("{T}", `<span class="tk">${T}</span>`)}</div>`;
+      return `<div class="post"><b>${u}</b> <span class="amt">bought $${2 + ((i * 7 + feedShift) % 9)}</span><br>${esc(THESES[(i + feedShift) % THESES.length]).replace("{T}", `<span class="tk">${T}</span>`)}</div>`;
     }).join("");
     app.innerHTML = `<div class="top">feed <small>${hhmm().slice(0, 5)}</small></div><div class="body">${posts}</div>${nav("feed")}${live ? `<div class="offline">phone offline · showing demo</div>` : ""}`;
   }
@@ -798,17 +823,17 @@ const phoneUI = (() => {
       await openToken(ep);
       await tapEl("#bBuy", "buy");
       const sheet = document.createElement("div"); sheet.className = "sheet";
-      sheet.innerHTML = `<div style="color:var(--dim)">amount, sol</div><div class="field" id="amt"></div>
+      sheet.innerHTML = `<div style="color:var(--dim)">amount, $</div><div class="field" id="amt"></div>
         <div class="chips"><span class="chip">0.1</span><span class="chip">0.25</span><span class="chip">0.5</span></div>
         <div style="color:var(--dim);margin-bottom:8px">buying <b style="color:#fff">$${esc(ep.symbol)}</b></div>
         <div class="btns" style="padding:0 0 12px"><div class="btn pink full" id="bConf">confirm buy</div></div>`;
       app.appendChild(sheet);
       await tapEl("#amt", "amount");
       await typeField($("amt"), String(ep.size), 12);
-      cap.textContent = `checking: ticker is $${ep.symbol}, amount ${ep.size} sol`; await sleep(900);
-      await tapEl("#bConf", `confirm buy ${ep.size} sol`);
+      cap.textContent = `checking: ticker is $${ep.symbol}, amount ${money(ep.size)}`; await sleep(900);
+      await tapEl("#bConf", `slide to buy ${money(ep.size)}`);
       sheet.remove();
-      const t = document.createElement("div"); t.className = "toast"; t.textContent = `bought ${ep.size} sol of $${ep.symbol}`; app.appendChild(t);
+      const t = document.createElement("div"); t.className = "toast"; t.textContent = `bought ${money(ep.size)} of $${ep.symbol}`; app.appendChild(t);
       cap.textContent = "order filled"; await sleep(1300); t.remove();
       // тезис в ленту
       app.innerHTML = `<div class="top">new thesis</div><div class="body"><div class="field" id="th" style="min-height:120px"></div></div><div class="btns"><div class="btn full" id="bPost">post</div></div>`;
@@ -1037,42 +1062,55 @@ function renderSignals(sig, hot = false) {
 }
 
 const tokenLink = (sym, addr) => addr ? `<a href="${CONFIG.fomoSite}/tokens/solana/${encodeURIComponent(addr)}" target="_blank" rel="noopener">$${esc(sym)}</a>` : `$${esc(sym)}`;
+const kfmtUsd = (n) => (n ? "$" + kfmt(n) : "—");
 function renderRules() {
   const r = S.rules; if (!r) return;
-  const p = (x) => Math.round(x * 100) + "%";
+  const p = (x) => Math.round(Math.abs(x) * 100) + "%";
   $("rules").innerHTML = [
-    `<li><b>${fmt(r.reserve)} sol</b> reserve is never traded</li>`,
-    `<li>bet size <b>${r.minPos}–${r.maxPos} sol</b>, scaled by conviction</li>`,
-    `<li>max <b>${r.maxOpen}</b> open, max <b>50%</b> of bank in market</li>`,
-    `<li>stop <b>${p(r.stop)}</b>, sell half at <b>+${p(r.tp1)}</b>, rest at <b>+${p(r.tp2)}</b></li>`,
-    `<li>trailing <b>${p(r.trail)}</b> after first take profit</li>`,
+    `<li>only <b>pump.fun</b> tokens above <b>${kfmtUsd(r.minMcap)}</b> market cap</li>`,
+    `<li>bet size <b>${money(r.minPos)}–${money(r.maxPos)}</b>, scaled by conviction</li>`,
+    `<li>max <b>${r.maxOpen}</b> open, max <b>${r.perHour}</b> new entries per hour</li>`,
+    `<li>stop <b>−${p(r.stop)}</b>, sell half at <b>+${p(r.tp1)}</b>, rest at <b>+${p(r.tp2)}</b></li>`,
+    `<li>trailing <b>${p(r.trail)}</b> after the first take profit</li>`,
     `<li>3 losses in a row → <b>2h</b> cooldown</li>`,
-    `<li>−${r.dailyLoss} sol in a day → done for the day</li>`,
-    `<li>below <b>${r.halt} sol</b> she stops until a human says go</li>`,
-    `<li>the phone refuses any order above <b>${r.maxPos} sol</b></li>`,
+    `<li>−${money(r.dailyLoss)} in a day → done for the day</li>`,
+    `<li><b>${money(r.reserve)}</b> reserve is never traded</li>`,
+    `<li>below <b>${money(r.halt)}</b> she stops until a human says go</li>`,
   ].join("");
+}
+function planCard(p) {
+  const pl = p.plan || {};
+  const lvl = (name, x, extra = "") => x ? `<span class="lv ${name}"><b>${name}</b> ${x.pct != null ? (x.pct >= 0 ? "+" : "−") + Math.round(Math.abs(x.pct) * 100) + "%" : ""}${x.mcap ? " · " + kfmtUsd(x.mcap) : ""}${extra}</span>` : "";
+  return `<div class="pcard">
+    <div class="ph"><span>${tokenLink(p.symbol, p.address)}${p.tp1Done ? " <small>half sold</small>" : ""}</span><span>${money(p.value ?? p.size)} <b class="${p.pnlPct >= 0 ? "pos" : "neg"}">${pct(p.pnlPct)}</b></span></div>
+    <div class="pm">entry mc ${kfmtUsd(p.entryMcap)} → now ${kfmtUsd(p.mcap)} · in for ${money(p.size)}</div>
+    <div class="pl">${lvl("sl", pl.sl)}${lvl("tp1", pl.tp1, pl.tp1?.done ? " ✓" : " · sell half")}${lvl("tp2", pl.tp2)}${pl.trail ? `<span class="lv trail"><b>trail</b> ${kfmtUsd(pl.trail.mcap)}</span>` : ""}</div>
+    ${p.note ? `<div class="pn">plan: ${esc(p.note)}</div>` : ""}
+    ${p.thesis ? `<div class="pt">“${esc(p.thesis)}”</div>` : ""}
+  </div>`;
 }
 function renderPanels() {
   renderRules();
   const b = S.bank;
-  $("barBank").textContent = fmt(b.equity);
+  $("barBank").textContent = money(b.equity);
   const pe = $("barPnl"); pe.textContent = pct(b.pnlPct); pe.className = b.pnlPct >= 0 ? "pos" : "neg";
   $("barGen").textContent = S.brain.generation;
-  $("barMode").textContent = S.live ? `live · ${S.mode || "paper"}` : "demo feed";
-  $("eq").innerHTML = `${fmt(b.equity)}<small>sol</small> <small class="${b.pnlPct >= 0 ? "pos" : "neg"}">${pct(b.pnlPct)}</small>`;
-  // шкала банка: резерв | кэш | в позициях, по 1 символу на ~0.25 sol
+  const cm = S.control?.mode || "on";
+  $("barMode").textContent = !S.live ? "demo feed" : cm === "off" ? "offline · stopped by admin" : cm === "pause" ? `paused · no new entries` : `live · ${S.mode || "paper"}`;
+  $("barMode").classList.toggle("paused", S.live && cm !== "on");
+  $("eq").innerHTML = `${money(b.equity)} <small class="${b.pnlPct >= 0 ? "pos" : "neg"}">${pct(b.pnlPct)}</small>`;
   const w = 30, scale = w / Math.max(b.start * 1.4, b.equity);
   const r = Math.round(b.reserve * scale), e = Math.round(b.exposure * scale), c = Math.max(0, Math.round((b.cash - b.reserve) * scale));
   $("meter").innerHTML = `<span class="r">${"▒".repeat(r)}</span>${"█".repeat(c)}<span class="f">${"█".repeat(e)}</span><span class="e">${"░".repeat(Math.max(0, w - r - c - e))}</span>`;
-  $("kStart").textContent = fmt(b.start); $("kCash").textContent = fmt(b.cash); $("kExp").textContent = fmt(b.exposure);
-  $("kRes").textContent = fmt(b.reserve); $("kDay").textContent = sgn(b.dayPnl, 3);
+  $("kStart").textContent = money(b.start); $("kCash").textContent = money(b.cash); $("kExp").textContent = money(b.exposure);
+  $("kRes").textContent = money(b.reserve); $("kDay").textContent = (b.dayPnl >= 0 ? "+" : "") + money(b.dayPnl);
   $("kTrades").textContent = S.stats.trades || 0; $("kWr").textContent = S.stats.trades ? (S.stats.winrate * 100).toFixed(0) + "%" : "—";
 
   $("positions").innerHTML = S.positions.length
-    ? `<table><tr><th>token</th><th>size</th><th>pnl</th></tr>${S.positions.map((p) => `<tr><td>${tokenLink(p.symbol, p.address)}${p.tp1Done ? " ½" : ""}</td><td>${fmt(p.sizeSol, 3)}</td><td class="${p.pnlPct >= 0 ? "pos" : "neg"}">${pct(p.pnlPct)}</td></tr>`).join("")}</table>`
-    : `<p class="empty">no open positions. she's waiting.</p>`;
+    ? S.positions.map(planCard).join("")
+    : `<p class="empty">no open positions. she's waiting for something worth it.</p>`;
   $("journal").innerHTML = S.journal.length
-    ? `<table><tr><th>time</th><th>token</th><th>size</th><th>exit</th><th>pnl</th></tr>${S.journal.slice(0, 10).map((t) => `<tr><td>${hhmm(t.closedAt).slice(0, 5)}</td><td>${tokenLink(t.symbol, t.address)}</td><td>${fmt(t.sizeSol, 3)}</td><td>${esc(t.reason)}</td><td class="${t.pnlSol >= 0 ? "pos" : "neg"}">${pct(t.pnlPct)}</td></tr>`).join("")}</table>`
+    ? `<table><tr><th>time</th><th>token</th><th>size</th><th>exit</th><th>pnl</th></tr>${S.journal.slice(0, 10).map((t) => { const pn = t.pnl ?? t.pnlSol ?? 0; return `<tr><td>${hhmm(t.closedAt).slice(0, 5)}</td><td>${tokenLink(t.symbol, t.address)}</td><td>${money(t.size ?? t.sizeSol)}</td><td>${esc(t.reason)}</td><td class="${pn >= 0 ? "pos" : "neg"}">${pct(t.pnlPct)}</td></tr>`; }).join("")}</table>`
     : `<p class="empty">no closed trades yet. the first one will show up here with its exit reason.</p>`;
   const maxW = Math.max(...SIGNALS.map((s) => +S.brain.weights[s]));
   $("weights").innerHTML = `<p class="empty" style="margin:0 0 8px">generation ${S.brain.generation} · enters at score ${S.brain.threshold}+</p>` +
@@ -1087,7 +1125,8 @@ function renderPanels() {
 function applyState(st) {
   const wasLive = S.live;
   Object.assign(S, { live: true, mode: st.mode, bank: st.bank || S.bank, positions: st.positions || S.positions, journal: st.journal || S.journal,
-    stats: st.stats || S.stats, brain: st.brain || S.brain, llm: st.llm || S.llm, updatedAt: st.updatedAt || Date.now(), rules: st.rules || S.rules });
+    stats: st.stats || S.stats, brain: st.brain || S.brain, llm: st.llm || S.llm, updatedAt: st.updatedAt || Date.now(), rules: st.rules || S.rules,
+    control: st.control || S.control });
   if (st.episodes) S.episodes = st.episodes;
   if (st.links) { CONFIG.fomoUrl = st.links.fomo || CONFIG.fomoUrl; CONFIG.fomoSite = st.links.fomoSite || CONFIG.fomoSite; CONFIG.xUrl = st.links.x || CONFIG.xUrl; CONFIG.githubUrl = st.links.github || CONFIG.githubUrl; applyLinks(); }
   $("updated").textContent = `brain last ticked ${new Date(S.updatedAt).toLocaleString()} · mode ${S.mode} · ${S.llm}`;
@@ -1113,10 +1152,12 @@ async function connectLive() {
       else if (e.type === "state") applyState(e);
       else if (e.type === "tap" || e.type === "phone-step") phoneUI.onEvent(e);
       else if (e.type === "learn") logLine("think", e.text);
+      else if (e.type === "control") { S.control = { mode: e.mode, at: e.at }; logLine("sys", `admin: agent ${e.mode}`); renderPanels(); }
+      else if (e.type === "stuck") logLine("money", e.text);
       else if (e.type === "error") logLine("money", `error: ${e.text}`);
-      else if (e.type === "buy") logLine("money", `bought $${e.symbol} · ${e.size} sol`);
+      else if (e.type === "buy") logLine("money", `bought $${e.symbol} · ${money(e.size)}`);
       else if (e.type === "exit") logLine("money", `exit $${e.symbol} · ${e.reason} · ${pct(e.pnlPct || 0)}`);
-      else if (e.type === "dry-run") logLine("sys", `dry run: $${e.symbol} ${e.size} sol not confirmed`);
+      else if (e.type === "dry-run") logLine("sys", `dry run: $${e.symbol} ${money(e.size)} not confirmed`);
     };
     S.liveServer = true;
     return true;
@@ -1145,7 +1186,7 @@ async function boot() {
   const el = $("boot");
   const lines = [
     ["", "fomi-os 0.1 · tty1"], ["d", "mounting brain/ .............. ok"], ["d", "loading 7 signals ............ ok"],
-    ["d", "bank: 5.000 sol · reserve 1.000"], ["d", "risk.rules ................... locked"], ["d", "opening gmgn, x, fomo ........ ok"],
+    ["d", "bank: usd · reserve $1"], ["d", "risk.rules ................... locked"], ["d", "opening gmgn, x, fomo ........ ok"],
     ["p", "she's awake."],
   ];
   let skip = false; el.onclick = () => (skip = true);

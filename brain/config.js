@@ -19,36 +19,51 @@ export const CFG = {
   mock: env("MOCK", "0") === "1",
   tickSeconds: num("TICK_SECONDS", 120),
 
+  // Банк в долларах — fomo торгует в USD. Минимальный ордер fomo $2 (и на покупку, и на продажу),
+  // поэтому позиция не меньше $3: даже после стопа −25% её можно закрыть.
   bank: {
-    start: num("START_BANK_SOL", 5),
-    reserve: num("RESERVE_SOL", 1),
-    maxPos: num("MAX_POSITION_SOL", 0.5),
-    minPos: num("MIN_POSITION_SOL", 0.1),
-    maxOpen: num("MAX_OPEN_POSITIONS", 4),
-    maxExposurePct: 0.5,          // не больше половины торгуемого банка в рынке
-    basePct: num("BASE_PCT", 0.06),  // базовый размер = доля торгуемого банка × уверенность
-    dailyLossLimit: num("DAILY_LOSS_LIMIT_SOL", 0.75),
-    haltEquity: num("HALT_EQUITY_SOL", 2.5),
-    lossStreakPause: 3,           // после 3 минусов подряд — пауза
+    unit: "usd",
+    start: num("START_BANK_USD", 15),
+    reserve: num("RESERVE_USD", 1),               // не торгуется никогда
+    minPos: num("MIN_POSITION_USD", 3),
+    maxPos: num("MAX_POSITION_USD", 5),
+    minOrder: num("FOMO_MIN_ORDER_USD", 2),       // ограничение fomo
+    maxOpen: num("MAX_OPEN_POSITIONS", 3),
+    maxExposurePct: num("MAX_EXPOSURE_PCT", 0.9), // доля торгуемого банка, которая может быть в рынке
+    basePct: num("BASE_PCT", 0.25),               // размер = торгуемый банк × basePct × (0.5 + уверенность)
+    dailyLossLimit: num("DAILY_LOSS_LIMIT_USD", 4),
+    haltEquity: num("HALT_EQUITY_USD", 6),        // ниже — полный стоп до `npm run resume`
+    lossStreakPause: 3,                           // 3 минуса подряд → пауза
     pauseMinutes: 120,
-    reentryCooldownH: 24,
-    feePct: 0.01,                 // комиссия свапа в paper-режиме
+    reentryCooldownH: 24,                         // в один токен не чаще раза в сутки
+    maxEntriesPerHour: num("MAX_ENTRIES_PER_HOUR", 3),
+    maxEntriesPerTick: num("MAX_ENTRIES_PER_TICK", 3),
+    feePct: 0.005,                                // комиссия fomo 0.5%
   },
 
   exits: {
-    stopLoss: -0.25,
-    tp1: 0.6, tp1Sell: 0.5,       // +60% — продать половину, стоп в безубыток
-    tp2: 2.0,                     // +200% — закрыть остаток
-    trail: 0.35,                  // после TP1 — трейлинг 35% от пика
-    timeStopH: 8, timeBand: [-0.1, 0.15],
+    stopLoss: -0.25,                // −25% — закрыть всё
+    tp1: 0.6, tp1Sell: 0.5,         // +60% — продать половину, стоп в безубыток
+    tp2: 1.5,                       // +150% — закрыть остаток
+    trail: 0.3,                     // после TP1 — трейлинг 30% от пика
+    timeStopH: 6, timeBand: [-0.1, 0.15],   // 6 часов топчется на месте — выйти
   },
 
+  // Жёсткие фильтры: не проходит хоть один — токен даже не рассматривается
   filters: {
-    minLiqUsd: 15000,
+    minMcapUsd: num("MIN_MCAP_USD", 100000),
+    pumpFunOnly: env("PUMPFUN_ONLY", "1") !== "0",   // только токены, запущенные на pump.fun
     maxAgeH: 72,
-    minAgeMin: 10,
-    minVol1hUsd: 5000,
+    minAgeMin: 15,
+    minVol1hUsd: 20000,
+    maxRug: 0.3,
+    maxTop10: 0.35,
+    maxBundler: 0.3,
+    maxSocialReuse: 5,              // X-аккаунт уже использовался под N токенов — мимо
   },
+
+  research: { websiteTimeoutMs: 6000, websiteChars: 900 },
+  admin: { token: env("ADMIN_TOKEN", "") },
 
   llm: (() => {
     // DEEPSEEK_API_KEY задан → DeepSeek (deepseek-flash, OpenAI-совместимый API), иначе Anthropic

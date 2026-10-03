@@ -10,6 +10,7 @@ async function get(url) {
 
 export function normalizePair(p, boosted = false) {
   const links = [...(p.info?.socials || []).map((s) => s.type), ...((p.info?.websites || []).length ? ["website"] : [])];
+  const social = (type) => (p.info?.socials || []).find((s) => s.type === type)?.url || "";
   return {
     address: p.baseToken?.address,
     symbol: (p.baseToken?.symbol || "?").toUpperCase(),
@@ -29,6 +30,7 @@ export function normalizePair(p, boosted = false) {
       h1: { b: p.txns?.h1?.buys || 0, s: p.txns?.h1?.sells || 0 },
     },
     socials: { twitter: links.includes("twitter"), telegram: links.includes("telegram"), website: links.includes("website") },
+    links: { website: p.info?.websites?.[0]?.url || "", twitter: social("twitter"), telegram: social("telegram") },
     boosted,
     url: p.url || `https://dexscreener.com/solana/${p.pairAddress}`,
   };
@@ -68,8 +70,10 @@ export async function scan() {
   ]);
   const sol = (a) => (Array.isArray(a) ? a : []).filter((x) => x.chainId === "solana").map((x) => x.tokenAddress);
   const boosted = new Set(sol(boosts));
+  const desc = new Map([...(Array.isArray(profiles) ? profiles : []), ...(Array.isArray(boosts) ? boosts : [])]
+    .filter((x) => x.chainId === "solana" && x.description).map((x) => [x.tokenAddress, x.description]));
   const addrs = [...new Set([...sol(profiles), ...boosted])].slice(0, 60);
-  return pairsFor(addrs, boosted);
+  return (await pairsFor(addrs, boosted)).map((t) => ({ ...t, description: desc.get(t.address) || "" }));
 }
 
 // Обновить цены по открытым позициям.

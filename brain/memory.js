@@ -7,12 +7,13 @@ export const saveJournal = (j) => save("journal", j.slice(-500));
 
 export function stats(journal) {
   const n = journal.length;
-  const wins = journal.filter((t) => t.pnlSol > 0);
-  const losses = journal.filter((t) => t.pnlSol <= 0);
-  const sum = (a) => a.reduce((s, t) => s + t.pnlSol, 0);
+  const pnl = (t) => t.pnl ?? t.pnlSol ?? 0;
+  const wins = journal.filter((t) => pnl(t) > 0);
+  const losses = journal.filter((t) => pnl(t) <= 0);
+  const sum = (a) => a.reduce((s, t) => s + pnl(t), 0);
   let streak = 0;
   for (let i = n - 1; i >= 0; i--) {
-    const w = journal[i].pnlSol > 0;
+    const w = pnl(journal[i]) > 0;
     if (i === n - 1) streak = w ? 1 : -1;
     else if (w === streak > 0) streak += w ? 1 : -1;
     else break;
