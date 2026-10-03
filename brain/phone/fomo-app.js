@@ -17,6 +17,7 @@ import { CFG } from "../config.js";
 import { phone } from "./index.js";
 import { emit } from "../bus.js";
 import { getControl } from "../control.js";
+import { look } from "./vision.js";
 
 const UI = JSON.parse(fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "fomo-ui.json"), "utf8"));
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -33,12 +34,30 @@ async function screen() {
   lastNodes = nodes;
   const all = nodes.map((n) => `${n.text} ${n.desc}`.toLowerCase()).join(" | ");
   const danger = (UI.dangerWords || []).find((w) => all.includes(w));
-  if (danger) {
-    emit("phone-step", { label: `unsafe screen ("${danger}") — backing out` });
-    await phone.back(); await wait(800); await phone.back();
-    throw new Error(`unsafe screen detected: "${danger}" — aborted`);
+  if (danger) await bail(`unsafe screen detected: "${danger}"`);
+  return { nodes, all, readable: nodes.some((n) => n.text) };
+}
+async function bail(why) {
+  emit("phone-step", { label: `${why} — backing out` });
+  await phone.back().catch(() => {}); await wait(800); await phone.back().catch(() => {});
+  throw new Error(`${why} — aborted`);
+}
+
+// Проверка экрана: сначала по тексту интерфейса, если Android его не отдал — по картинке через модель с «глазами».
+async function verify({ ticker, amount, kind }) {
+  const s = await screen();
+  if (s.readable) {
+    const ok = s.all.includes(String(ticker).toLowerCase()) && (!amount || s.all.includes(`$${amount}`));
+    return { ok, how: "ui" };
   }
-  return { nodes, all };
+  const jpg = await phone.screenshot().catch(() => null);
+  if (!jpg) return { ok: false, how: "no screen" };
+  const v = await look(jpg, `Expected: ${kind} for ticker ${ticker}${amount ? `, amount $${amount}` : ""}. Is that what the screen shows?`);
+  if (!v) return { ok: false, how: "vision unavailable" };
+  if (v.danger) await bail("unsafe screen detected by vision");
+  const tick = String(v.ticker || "").replace(/^\$/, "").toLowerCase() === String(ticker).toLowerCase();
+  const amt = !amount || String(v.amount || "").replace(/[$\s]/g, "") === String(amount);
+  return { ok: !!v.ok && tick && amt, how: "vision", saw: v };
 }
 
 async function point(sel, fresh = true) {
@@ -97,8 +116,8 @@ export async function openToken(address, symbol) {
   emit("phone-step", { label: `opening $${symbol} on fomo` });
   try {
     await phone.openUrl(UI.deepLink.replace("{CA}", address), UI.package);
-    await wait(4000);
-    if (has((await screen()).all, [symbol])) return;
+    await wait(4500);
+    if ((await verify({ ticker: symbol, kind: "token page" })).ok) return;
   } catch (e) { if (/unsafe|STOP|admin/.test(e.message)) throw e; }
   emit("phone-step", { label: "searching by contract" });
   await phone.openApp(UI.package);
@@ -109,7 +128,8 @@ export async function openToken(address, symbol) {
   await wait(3000);
   await tapStep("firstResult", `$${symbol}`);
   await wait(3500);
-  if (!has((await screen()).all, [symbol])) throw new Error(`token page for $${symbol} did not open`);
+  const v = await verify({ ticker: symbol, kind: "token page" });
+  if (!v.ok) throw new Error(`token page for $${symbol} did not open (${v.how}${v.saw ? ": saw " + JSON.stringify(v.saw) : ""})`);
 }
 
 export async function buy({ address, symbol, usd, thesis }) {
@@ -119,8 +139,8 @@ export async function buy({ address, symbol, usd, thesis }) {
   await tapStep("buyButton", "buy");
   await wait(1200);
   const amt = await typeAmount(UI.keypadBuy, usd);
-  const s1 = await screen();
-  if (!has(s1.all, [symbol, `$${amt}`])) { await phone.back(); throw new Error(`buy screen doesn't show $${symbol} / $${amt} — aborted`); }
+  const v1 = await verify({ ticker: symbol, amount: amt, kind: "buy screen" });
+  if (!v1.ok) { await phone.back(); throw new Error(`buy screen check failed for $${symbol} / $${amt} (${v1.how}${v1.saw ? ": saw " + JSON.stringify(v1.saw) : ""}) — aborted`); }
   if (CFG.phone.dryRun) {
     emit("phone-step", { label: `dry run: would slide to buy $${amt} of $${symbol}` });
     await phone.back();
@@ -128,8 +148,7 @@ export async function buy({ address, symbol, usd, thesis }) {
   }
   await swipe(UI.slideBuy, `slide to buy $${amt}`);
   await wait(6000);
-  const s2 = await screen();
-  if (!has(s2.all, ["your position"])) emit("phone-step", { label: "no position visible yet — checking again" });
+
   emit("phone-step", { label: `bought $${amt} of $${symbol}` });
   let thesisPosted = false;
   if (thesis) thesisPosted = await postThesis(symbol, thesis);
@@ -161,7 +180,8 @@ export async function sell({ address, symbol, pct }) {
   await tapStep(pct >= 0.99 ? "sellMax" : "sell50", pct >= 0.99 ? "max" : "50%");
   const s1 = await screen();
   if (s1.all.includes("minimum")) { await phone.back(); return { filled: false, stuck: true }; }
-  if (!has(s1.all, [symbol])) { await phone.back(); throw new Error(`sell screen doesn't show $${symbol} — aborted`); }
+  const v1 = await verify({ ticker: symbol, kind: "sell screen" });
+  if (!v1.ok) { await phone.back(); throw new Error(`sell screen check failed for $${symbol} (${v1.how}) — aborted`); }
   if (CFG.phone.dryRun) {
     emit("phone-step", { label: `dry run: would slide to sell ${pct >= 0.99 ? "all" : "half"} of $${symbol}` });
     await phone.back();

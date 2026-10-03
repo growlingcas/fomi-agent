@@ -95,6 +95,21 @@ export const type = (text) => call(`${P}/inputText`, { padCodes: [pad()], text }
 export const openApp = (pkg) => call(`${P}/startApp`, { padCodes: [pad()], pkgName: pkg });
 export const openUrl = (url, pkg) => sh(`am start -a android.intent.action.VIEW -d '${url.replace(/'/g, "")}' ${pkg || ""}`);
 export async function dumpUi() {
-  const xml = await sh("uiautomator dump /sdcard/fomi_ui.xml >/dev/null 2>&1; cat /sdcard/fomi_ui.xml", true);
-  return { xml, nodes: parseUi(xml) };
+  // компактный дамп: только text / content-desc / bounds каждого элемента — полный XML слишком большой для ответа API
+  const out = await sh(`uiautomator dump /sdcard/fomi_ui.xml >/dev/null 2>&1; tr '>' '\\n' < /sdcard/fomi_ui.xml | grep -oE 'text="[^"]*"|content-desc="[^"]*"|bounds="[^"]*"'`, true);
+  const nodes = [];
+  let cur = {};
+  for (const line of out.split("\n")) {
+    const m = line.match(/^(text|content-desc|bounds)="(.*)"$/);
+    if (!m) continue;
+    if (m[1] === "text") cur.text = m[2];
+    else if (m[1] === "content-desc") cur.desc = m[2];
+    else {
+      const b = m[2].match(/\[(\d+),(\d+)\]\[(\d+),(\d+)\]/);
+      if (b) { const [x1, y1, x2, y2] = b.slice(1).map(Number); nodes.push({ text: cur.text || "", desc: cur.desc || "", x: (x1 + x2) / 2, y: (y1 + y2) / 2, w: x2 - x1, h: y2 - y1, clickable: true }); }
+      cur = {};
+    }
+  }
+  return { xml: out, nodes };
 }
+

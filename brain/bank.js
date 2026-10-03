@@ -54,8 +54,9 @@ export function sizeFor(b, eq, conviction, address) {
   let size = tradable * c.basePct * (0.5 + Math.max(0, Math.min(1, conviction)));
   size = Math.max(size, c.minPos);
   size = Math.min(size, c.maxPos, tradable * c.maxExposurePct - exposure(b), b.cash - c.reserve);
+  size = Math.floor(size);                       // целые доллары: на клавиатуре fomo одно нажатие, меньше шансов ошибиться
   if (size < c.minPos) return null;
-  return Math.floor(size * 100) / 100;
+  return size;
 }
 
 export function recordClose(b, pnl) {
