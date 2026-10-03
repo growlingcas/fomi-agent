@@ -50,7 +50,16 @@ export const CFG = {
     minVol1hUsd: 5000,
   },
 
-  llm: { key: env("ANTHROPIC_API_KEY", ""), model: env("LLM_MODEL", "claude-haiku-4-5-20251001") },
+  llm: (() => {
+    // DEEPSEEK_API_KEY задан → DeepSeek (deepseek-flash, OpenAI-совместимый API), иначе Anthropic
+    const ds = env("DEEPSEEK_API_KEY", "");
+    const provider = env("LLM_PROVIDER", ds ? "deepseek" : "anthropic");
+    let model = env("LLM_MODEL", "");
+    if (provider === "deepseek" && (!model || model.startsWith("claude"))) model = "deepseek-flash";
+    if (provider === "anthropic" && !model) model = "claude-haiku-4-5-20251001";
+    return { provider, model, key: provider === "deepseek" ? ds : env("ANTHROPIC_API_KEY", ""),
+      base: env("LLM_BASE_URL", provider === "deepseek" ? "https://api.deepseek.com" : "https://api.anthropic.com") };
+  })(),
 
   x: {
     post: env("X_POST", "0") === "1",
