@@ -23,6 +23,7 @@
     "unstop": "node brain/cli.js unstop",
     "phone:ping": "node brain/cli.js phone-ping",
     "phone:resize": "node brain/cli.js phone-resize",
+    "phone:debug": "node brain/cli.js phone-debug",
     "gmgn:keys": "gmgn-cli config",
     "gmgn:check": "gmgn-cli market trending --chain sol --interval 1h --limit 3"
   },
