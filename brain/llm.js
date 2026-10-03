@@ -25,26 +25,41 @@ function ruleBased(t, sig, sc, threshold) {
   };
 }
 
+// Один запрос к модели. DeepSeek — OpenAI-совместимый /chat/completions, Anthropic — /v1/messages.
+async function ask(user) {
+  if (CFG.llm.provider === "deepseek") {
+    const r = await fetch(`${CFG.llm.base}/chat/completions`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${CFG.llm.key}` },
+      body: JSON.stringify({ model: CFG.llm.model, max_tokens: 400, temperature: 0.4, response_format: { type: "json_object" },
+        messages: [{ role: "system", content: PERSONA }, { role: "user", content: user }] }),
+    });
+    if (!r.ok) throw new Error("llm " + r.status);
+    const j = await r.json();
+    return j.choices?.[0]?.message?.content || "";
+  }
+  const r = await fetch(`${CFG.llm.base}/v1/messages`, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-api-key": CFG.llm.key, "anthropic-version": "2023-06-01" },
+    body: JSON.stringify({ model: CFG.llm.model, max_tokens: 400, system: PERSONA, messages: [{ role: "user", content: user }] }),
+  });
+  if (!r.ok) throw new Error("llm " + r.status);
+  const j = await r.json();
+  return (j.content || []).map((c) => c.text || "").join("");
+}
+
 export async function decide(t, sig, sc, brain, stats) {
   const fallback = ruleBased(t, sig, sc, brain.threshold);
   if (!CFG.llm.key || sc < brain.threshold - 8) return fallback;   // слабых даже не показываем модели — экономия
   const payload = {
     token: { symbol: t.symbol, ageMin: Math.round(t.ageMin), liqUsd: Math.round(t.liqUsd), fdv: Math.round(t.fdv),
-      vol: t.vol, chg: t.chg, txns: t.txns, socials: t.socials },
+      vol: t.vol, chg: t.chg, txns: t.txns, socials: t.socials, gmgn: t.gmgn || null },
     signals: Object.fromEntries(Object.entries(sig).map(([k, v]) => [k, +v.toFixed(2)])),
     score: sc, threshold: brain.threshold,
     myStats: { trades: stats.trades, winrate: stats.winrate, streak: stats.streak },
   };
   try {
-    const r = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: { "content-type": "application/json", "x-api-key": CFG.llm.key, "anthropic-version": "2023-06-01" },
-      body: JSON.stringify({ model: CFG.llm.model, max_tokens: 400, system: PERSONA,
-        messages: [{ role: "user", content: JSON.stringify(payload) }] }),
-    });
-    if (!r.ok) throw new Error("llm " + r.status);
-    const j = await r.json();
-    const text = (j.content || []).map((c) => c.text || "").join("").replace(/```json|```/g, "").trim();
+    const text = (await ask(JSON.stringify(payload))).replace(/```json|```/g, "").trim();
     const out = JSON.parse(text);
     if (!["ENTER", "SKIP"].includes(out.decision)) throw new Error("bad decision");
     // жёсткие правила риска сильнее модели
