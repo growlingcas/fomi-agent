@@ -53,6 +53,21 @@ if (cmd === "status") {
     console.log("frame saved to brain/data/phone/ping.jpg", img.length, "bytes");
   } catch (e) { console.error("phone error:", e.message); process.exit(1); }
   process.exit(0);
+} else if (cmd === "phone-debug") {
+  // диагностика VMOS: какие команды отдают вывод и как называется пакет fomo
+  const v = await import("./phone/vmos-api.js");
+  const P = "/vcpcloud/api/padApi";
+  const text = "pm list packages | grep -i -E 'fomo|family'; wm size";
+  try { console.log("syncCmd", JSON.stringify(await v.call(`${P}/syncCmd`, { padCodes: [CFG.phone.padCode], scriptContent: text }))); } catch (e) { console.log("syncCmd ERR", e.message); }
+  const d = await v.call(`${P}/asyncCmd`, { padCodes: [CFG.phone.padCode], scriptContent: text });
+  console.log("asyncCmd", JSON.stringify(d));
+  for (let i = 0; i < 5; i++) {
+    await new Promise((r) => setTimeout(r, 1500));
+    for (const ep of ["executeScriptInfo", "padTaskDetail"]) {
+      try { console.log(ep, JSON.stringify(await v.call(`${P}/${ep}`, { taskIds: [d?.taskId] }))); } catch (e) { console.log(ep, "ERR", e.message); }
+    }
+  }
+  process.exit(0);
 } else if (cmd === "phone-resize") {
   // экран облачного телефона в обычную форму: npm run phone:resize   (вернуть как было: npm run phone:resize -- reset)
   const { phone } = await import("./phone/index.js");
