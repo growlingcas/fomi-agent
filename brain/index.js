@@ -9,7 +9,7 @@ import { feed } from "./sources/fomo.js";
 import { research } from "./research.js";
 import { SIGNALS, passesFilters, computeSignals, score } from "./signals.js";
 import { loadBrain, learnFromTrade } from "./learn.js";
-import { decide } from "./llm.js";
+import { decide, reviewPosition } from "./llm.js";
 import { loadBank, saveBank, equity, gate, sizeFor, exitCheck, recordClose, priceOf, valueOf } from "./bank.js";
 import { loadJournal, saveJournal, stats, pushEvent, pushEpisode } from "./memory.js";
 import { getControl } from "./control.js";
@@ -60,9 +60,33 @@ async function manageOpen(bank, journal, prices) {
     catch (e) { bank.needSync = true; pushEvent({ type: "error", text: `sell $${pos.symbol} failed: ${e.message}` }); log("sell failed", e.message); continue; }
     if (!res.filled) { log("sell not filled", pos.symbol, ex.reason, res.dry ? "(dry run)" : ""); continue; }
     if (ex.reason === "tp1") pos.tp1Done = true;
+    (pos.partials ||= []).push({ at: Date.now(), pct: ex.pct, pnlPct: +(price / pos.entryPrice - 1).toFixed(4), reason: ex.reason, mcap: pos.lastMcap || 0 });
     pushEvent({ type: "exit", symbol: pos.symbol, reason: ex.reason, pct: ex.pct, pnlPct: price / pos.entryPrice - 1 });
     log("exit", pos.symbol, ex.reason, `${(ex.pct * 100).toFixed(0)}%`);
     if (pos.remaining <= 0.001) closePosition(bank, journal, pos, ex.reason);
+  }
+}
+
+// Ревью держимых токенов раз в 20 минут: если тезис сломался — выходим, не дожидаясь стопа
+async function reviewOpen(bank, journal, prices, scanned) {
+  for (const pos of [...bank.positions]) {
+    if (Date.now() - pos.openedAt < 15 * 60e3 || Date.now() - (pos.reviewedAt || 0) < 20 * 60e3) continue;
+    const t = scanned.find((x) => x.address === pos.address) || prices.get(pos.address);
+    if (!t || !t.priceUsd) continue;
+    pos.reviewedAt = Date.now();
+    const r = await reviewPosition(pos, t, null);
+    if (!r) continue;
+    pos.lastReview = r;
+    pushEvent({ type: "review", symbol: pos.symbol, text: `review $${pos.symbol}: ${r.action.toLowerCase()} — ${r.reason}` });
+    if (r.action !== "EXIT") continue;
+    const value = valueOf(pos, priceOf(t));
+    if (value < CFG.bank.minOrder) { pushEvent({ type: "stuck", text: `$${pos.symbol}: wants out but it's under $${CFG.bank.minOrder}` }); continue; }
+    let res;
+    try { res = await exec.sell(bank, pos, 1, t, "thesis broken"); } catch (e) { bank.needSync = true; pushEvent({ type: "error", text: `sell $${pos.symbol} failed: ${e.message}` }); continue; }
+    if (!res.filled) continue;
+    (pos.partials ||= []).push({ at: Date.now(), pct: 1, pnlPct: +(priceOf(t) / pos.entryPrice - 1).toFixed(4), reason: "thesis broken: " + r.reason, mcap: t.mcap || 0 });
+    pushEvent({ type: "exit", symbol: pos.symbol, reason: "thesis broken", pct: 1, pnlPct: priceOf(t) / pos.entryPrice - 1 });
+    closePosition(bank, journal, pos, `thesis broken: ${r.reason}`);
   }
 }
 
@@ -71,7 +95,8 @@ export function closePosition(bank, journal, pos, reason) {
   const pnl = +(pos.realized || 0).toFixed(4);
   const pnlPct = +(pnl / pos.size).toFixed(4);
   const trade = { symbol: pos.symbol, address: pos.address, size: pos.size, pnl, pnlPct, reason,
-    openedAt: pos.openedAt, closedAt: Date.now(), score: pos.score, signals: pos.signals, thesis: pos.thesis };
+    openedAt: pos.openedAt, closedAt: Date.now(), score: pos.score, signals: pos.signals, thesis: pos.thesis,
+    entryMcap: pos.entryMcap || 0, exitMcap: pos.lastMcap || 0, plan: pos.plan?.note || "", partials: pos.partials || [] };
   journal.push(trade);
   recordClose(bank, pnl);
   const lesson = learnFromTrade(trade, journal);
@@ -86,6 +111,7 @@ async function hunt(bank, journal, brain, prices, paused) {
   const scanned = await market.scan();
   pushEvent({ type: "scan", source: CFG.mock ? "mock" : scanned[0]?.source || "dexscreener", count: scanned.length });
   log(`scanned ${scanned.length} tokens`);
+  await reviewOpen(bank, journal, prices, scanned);
 
   const held = new Set(bank.positions.map((p) => p.address));
   const seen = load("seen", {});
@@ -100,10 +126,12 @@ async function hunt(bank, journal, brain, prices, paused) {
 
   // экран скринера: что она видит в трендах и почему отсеивает — разные токены каждый скан
   const byVol = (a, b) => (b.t.vol?.h1 || 0) - (a.t.vol?.h1 || 0);
-  const shown = [...picks, ...ranked.filter((x) => !picks.includes(x)).sort(byVol).slice(0, 14 - picks.length)].sort(byVol);
+  const passing = ranked.filter((x) => !x.why && !picks.includes(x)).sort(byVol);
+  const rejected = ranked.filter((x) => x.why).sort(byVol);
+  const shown = [...picks, ...passing, ...rejected].slice(0, 16);
   const verdict = (x) => (picks.includes(x) ? "→ look" : x.why ? "✗ " + x.why : fresh(x.t) ? "✓" : "· seen");
   const screenPage = (focus) => ({
-    source: "gmgn", url: "gmgn.ai/trend?chain=sol", title: `pump.fun · trending 1h + 5m + just migrated · ${scanned.length} tokens`,
+    source: "gmgn", url: "gmgn.ai/trend?chain=sol", title: `pump.fun · trending 1h + 5m + just migrated · ${scanned.length} scanned · ${ranked.filter((x) => !x.why).length} pass filters`,
     lines: shown.map((x) => gRow(x.t, verdict(x))), focus,
   });
   if (!picks.length) {
@@ -174,7 +202,8 @@ async function hunt(bank, journal, brain, prices, paused) {
 
     if (action === "ENTER") {
       let res;
-      try { res = await exec.buy(bank, t, size, { signals: sig, score: sc, thesis: d.thesis, plan }); }
+      const entryGmgn = t.gmgn ? { smart: t.gmgn.smart, holders: t.gmgn.holders, top10: t.gmgn.top10, kol: t.gmgn.kol } : null;
+      try { res = await exec.buy(bank, t, size, { signals: sig, score: sc, thesis: d.thesis, plan, entryGmgn, name: t.gmgn?.name || t.name || "" }); }
       catch (e) { pushEvent({ type: "error", text: `buy $${t.symbol} failed: ${e.message}` }); log("buy failed", e.message); continue; }
       bank.lastEntry[t.address] = Date.now();
       if (res.filled || res.order) { bank.entryTimes.push(Date.now()); entered++; }
@@ -187,7 +216,7 @@ async function hunt(bank, journal, brain, prices, paused) {
         pushEvent({ type: "error", text: `buy $${t.symbol} $${size} sent but not confirmed on screen — checking fomo` });
       }
       pushEvent({ type: res.dry ? "dry-run" : res.filled ? "buy" : res.unconfirmed ? "unconfirmed" : "order", symbol: t.symbol, size, thesis: d.thesis });
-      if (res.filled) post(entryTweet(t, size, d.thesis));
+      if (res.filled) { post(entryTweet(t, size, d.thesis)); bank.needSync = true; }
     }
   }
 }
@@ -196,7 +225,7 @@ async function hunt(bank, journal, brain, prices, paused) {
 // fomo — источник правды по деньгам: кэш берём оттуда, позиции сопоставляем по тикеру/названию.
 export async function syncWithFomo(bank, journal, force = false) {
   if (!exec.portfolio) return null;
-  const hourly = Date.now() - (bank.lastSync || 0) > (Number(process.env.SYNC_MINUTES) || 60) * 60e3;
+  const hourly = Date.now() - (bank.lastSync || 0) > (Number(process.env.SYNC_MINUTES) || 15) * 60e3;
   if (!force && !hourly && !bank.needSync) return null;
   let pf;
   try { pf = await exec.portfolio(); } catch (e) { pushEvent({ type: "error", text: `fomo sync failed: ${e.message}` }); return null; }
@@ -208,7 +237,16 @@ export async function syncWithFomo(bank, journal, force = false) {
   const matched = new Set();
   for (const pos of [...bank.positions]) {
     const f = pf.positions.find((q, i) => !matched.has(i) && (norm(q.ticker) === norm(pos.symbol) || (pos.name && norm(q.name) === norm(pos.name))));
-    if (f) { matched.add(pf.positions.indexOf(f)); pos.fomoValue = f.value; pos.missing = 0; continue; }
+    if (f) {
+      matched.add(pf.positions.indexOf(f)); pos.fomoValue = f.value; pos.missing = 0;
+      // fomo — правда: пересчитываем сколько у нас токенов и реальную цену входа, чтобы pnl на сайте и стопы совпадали с fomo
+      if (f.value > 0 && pos.lastPrice > 0 && pos.remaining > 0) {
+        pos.tokens = f.value / (pos.remaining * pos.lastPrice);
+        pos.entryPrice = pos.size / pos.tokens;
+        pos.calibratedAt = Date.now();
+      }
+      continue;
+    }
     pos.missing = (pos.missing || 0) + 1;
     if (pos.missing >= 2) {                                  // дважды подряд нет в fomo — значит, позиции больше нет
       const lastValue = pos.fomoValue ?? valueOf(pos, pos.lastPrice || pos.entryPrice);   // точной цены выхода нет — берём последнюю оценку

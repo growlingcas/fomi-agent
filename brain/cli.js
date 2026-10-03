@@ -58,6 +58,19 @@ if (cmd === "status") {
   }
   bank.orders = bank.orders.filter((x) => x.id !== o.id);
   console.log("confirmed", o.id);
+} else if (cmd === "llm-test") {
+  // проверка модели: текст и (если указан кадр с телефона) картинка
+  const { askJson, lastLlmError } = await import("./llmcall.js");
+  console.log("model:", CFG.llm.provider, CFG.llm.model, CFG.llm.key ? "key ok" : "NO KEY");
+  const t = await askJson('Reply ONLY with JSON {"ok":true,"says":"short greeting"}', "say hi", { maxTokens: 1500 });
+  console.log("text →", t, t ? "" : (await import("./llmcall.js")).lastLlmError);
+  try {
+    const { phone } = await import("./phone/index.js");
+    const jpg = await phone.screenshot();
+    const v = await askJson('Reply ONLY with JSON {"ok":true,"what":"one line: what app screen is this"}', "describe the screen", { image: jpg, maxTokens: 1500 });
+    console.log("vision →", v, v ? "" : (await import("./llmcall.js")).lastLlmError);
+  } catch (e) { console.log("vision skipped:", e.message); }
+  done();
 } else if (cmd === "sync") {
   // сверка с fomo прямо сейчас: кэш и позиции
   const { syncWithFomo } = await import("./index.js");
@@ -107,7 +120,7 @@ if (cmd === "status") {
   for (const f of ["bank", "journal", "events", "episodes", "brain", "outbox", "mock_world"]) fs.rmSync(`${CFG.paths.data}/${f}.json`, { force: true });
   console.log("reset to $" + CFG.bank.start); done();
 } else {
-  console.log("commands: admin [status|on|pause|off] | status | sync | confirm <orderId> [price] | resume | reset | stop | unstop | phone-ping | phone-snap | phone-debug | phone-resize | phone-test <CA> <TICKER> [usd]");
+  console.log("commands: admin [status|on|pause|off] | status | sync | llm-test | confirm <orderId> [price] | resume | reset | stop | unstop | phone-ping | phone-snap | phone-debug | phone-resize | phone-test <CA> <TICKER> [usd]");
   done();
 }
 saveBank(bank); saveJournal(journal);

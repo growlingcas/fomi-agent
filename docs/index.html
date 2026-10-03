@@ -146,6 +146,20 @@ td:last-child,th:last-child{text-align:right}
 .bar .live.paused::before{background:var(--dim)}
 .planline{font-size:11.5px;color:var(--text)} .planline b{color:var(--hair);font-weight:600}
 
+/* ── история сделок ── */
+.hsum{display:flex;flex-wrap:wrap;gap:8px 26px;font-size:12px;color:var(--dim);margin:0 0 14px}
+.hsum b{color:#e6e7e0;font-weight:600}
+.hlist{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px}
+.trade{border:1px solid #1f201b;padding:12px;font-size:12px;background:#030303}
+.trade .th{display:flex;justify-content:space-between;gap:8px;font-size:13px;color:#e6e7e0}
+.trade .tm{color:var(--dim);margin:4px 0 8px}
+.trade .tx{color:var(--peach);margin:6px 0}
+.trade .tp{color:var(--text)}
+.trade .tparts{color:var(--dim);margin-top:6px}
+.trade .why{display:inline-block;margin-top:6px;padding:1px 6px;border:1px solid #2a2b25;color:var(--text)}
+.trade.win{border-left:2px solid var(--hair)} .trade.loss{border-left:2px solid var(--pink)}
+.pcard .rv{margin-top:4px;color:var(--sky)}
+
 /* ── мозг ── */
 .brain{margin-top:26px;padding:0;display:grid;grid-template-columns:260px minmax(0,1fr) 260px;min-height:470px;border-color:#2e3029}
 .brain>h2{color:var(--text)}
@@ -437,6 +451,12 @@ footer p{margin:0;max-width:80ch}
     </section>
   </div>
 
+  <section class="pane history" style="margin-top:26px">
+    <h2><i>$</i> cat trades.log — every trade, thesis and result</h2>
+    <div class="hsum" id="hsum"></div>
+    <div class="hlist" id="history"></div>
+  </section>
+
   <section class="pane" style="margin-top:26px">
     <h2><i>$</i> how she decides</h2>
     <ol class="steps">
@@ -447,7 +467,8 @@ footer p{margin:0;max-width:80ch}
       <li>decide <span>— rules first, then deepseek makes the final call, writes the plan and the thesis</span></li>
       <li>size the bet <span>— $3–5 from conviction, max 3 new entries an hour, often zero</span></li>
       <li>trade on the phone <span>— opens the token in fomo, types the amount, checks ticker and sum, slides to buy, posts the thesis</span></li>
-      <li>exit <span>— stop −25%, half at +60%, rest at +150%, trailing 30%, time stop 6h</span></li>
+      <li>exit <span>— stop −25%, half at +60%, rest at +150%, trailing 30%, time stop 6h — plus a review every 20 min: if the thesis breaks, she leaves early</span></li>
+      <li>check the books <span>— every 15 min she opens her fomo profile and syncs cash and positions, so the pnl here matches the app</span></li>
       <li>learn <span>— every closed trade shifts the weights; a new brain generation</span></li>
     </ol>
   </section>
@@ -1119,7 +1140,32 @@ function planCard(p) {
     <div class="pl">${lvl("sl", pl.sl)}${lvl("tp1", pl.tp1, pl.tp1?.done ? " ✓" : " · sell half")}${lvl("tp2", pl.tp2)}${pl.trail ? `<span class="lv trail"><b>trail</b> ${kfmtUsd(pl.trail.mcap)}</span>` : ""}</div>
     ${p.note ? `<div class="pn">plan: ${esc(p.note)}</div>` : ""}
     ${p.thesis ? `<div class="pt">“${esc(p.thesis)}”</div>` : ""}
+    ${p.review ? `<div class="rv">last review: ${esc(p.review.action.toLowerCase())} — ${esc(p.review.reason)}</div>` : ""}
   </div>`;
+}
+const dur = (ms) => { const m = Math.max(0, Math.round(ms / 60000)); return m < 60 ? m + "m" : m < 1440 ? Math.floor(m / 60) + "h " + (m % 60) + "m" : Math.floor(m / 1440) + "d"; };
+function renderHistory() {
+  const J = S.journal || [];
+  const pnlOf = (t) => t.pnl ?? t.pnlSol ?? 0;
+  const total = J.reduce((a, t) => a + pnlOf(t), 0), wins = J.filter((t) => pnlOf(t) > 0).length;
+  const best = J.reduce((a, t) => (!a || t.pnlPct > a.pnlPct ? t : a), null), worst = J.reduce((a, t) => (!a || t.pnlPct < a.pnlPct ? t : a), null);
+  $("hsum").innerHTML = J.length ? [
+    `trades <b>${J.length}</b>`, `win rate <b>${Math.round(wins / J.length * 100)}%</b>`,
+    `realized <b class="${total >= 0 ? "pos" : "neg"}">${total >= 0 ? "+" : ""}${money(total)}</b>`,
+    best ? `best <b class="pos">$${esc(best.symbol)} ${pct(best.pnlPct)}</b>` : "", worst ? `worst <b class="neg">$${esc(worst.symbol)} ${pct(worst.pnlPct)}</b>` : "",
+  ].filter(Boolean).join("") : "";
+  $("history").innerHTML = J.length ? J.slice(0, 30).map((t) => {
+    const pn = pnlOf(t);
+    const parts = (t.partials || []).filter((p) => p.pct < 1).map((p) => `sold ${Math.round(p.pct * 100)}% at ${pct(p.pnlPct)} (${esc(p.reason)})`).join(" · ");
+    return `<div class="trade ${pn >= 0 ? "win" : "loss"}">
+      <div class="th"><span>${tokenLink(t.symbol, t.address)}</span><span>${money(t.size ?? t.sizeSol)} → <b class="${pn >= 0 ? "pos" : "neg"}">${pn >= 0 ? "+" : ""}${money(pn)} · ${pct(t.pnlPct)}</b></span></div>
+      <div class="tm">${t.openedAt ? new Date(t.openedAt).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : ""} · held ${t.openedAt ? dur(t.closedAt - t.openedAt) : "—"}${t.entryMcap ? ` · mc ${kfmtUsd(t.entryMcap)} → ${kfmtUsd(t.exitMcap)}` : ""}</div>
+      ${t.thesis ? `<div class="tx">“${esc(t.thesis)}”</div>` : ""}
+      ${t.plan ? `<div class="tp">plan: ${esc(t.plan)}</div>` : ""}
+      ${parts ? `<div class="tparts">${parts}</div>` : ""}
+      <span class="why">exit: ${esc(t.reason)}</span>
+    </div>`;
+  }).join("") : `<p class="empty">no closed trades yet. every exit lands here with its thesis, plan and result.</p>`;
 }
 function renderPanels() {
   renderRules();
@@ -1143,6 +1189,7 @@ function renderPanels() {
     : `<p class="empty">no open positions. she's waiting for something worth it.</p>`) +
     ((S.external || []).length ? `<div class="pm" style="margin-top:10px">also in her fomo wallet, not opened by the brain: ${S.external.map((q) => `$${esc(q.ticker || q.name)} ${money(q.value)}`).join(" · ")}</div>` : "") +
     (S.lastSync ? `<div class="pm">last checked against fomo ${hhmm(S.lastSync).slice(0, 5)}</div>` : "");
+  renderHistory();
   $("journal").innerHTML = S.journal.length
     ? `<table><tr><th>time</th><th>token</th><th>size</th><th>exit</th><th>pnl</th></tr>${S.journal.slice(0, 10).map((t) => { const pn = t.pnl ?? t.pnlSol ?? 0; return `<tr><td>${hhmm(t.closedAt).slice(0, 5)}</td><td>${tokenLink(t.symbol, t.address)}</td><td>${money(t.size ?? t.sizeSol)}</td><td>${esc(t.reason)}</td><td class="${pn >= 0 ? "pos" : "neg"}">${pct(t.pnlPct)}</td></tr>`; }).join("")}</table>`
     : `<p class="empty">no closed trades yet. the first one will show up here with its exit reason.</p>`;
@@ -1190,6 +1237,7 @@ async function connectLive() {
       else if (e.type === "stuck") logLine("money", e.text);
       else if (e.type === "thesis") logLine("voice", e.text);
       else if (e.type === "sync") logLine("sys", e.text);
+      else if (e.type === "review") logLine("think", e.text);
       else if (e.type === "error") logLine("money", `error: ${e.text}`);
       else if (e.type === "buy") logLine("money", `bought $${e.symbol} · ${money(e.size)}`);
       else if (e.type === "exit") logLine("money", `exit $${e.symbol} · ${e.reason} · ${pct(e.pnlPct || 0)}`);

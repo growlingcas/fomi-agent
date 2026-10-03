@@ -21,7 +21,8 @@ export function publish(bank, brain, journal, prices, control = { mode: "on" }) 
       symbol: p.symbol, address: p.address, url: p.url, size: r2(p.size), remaining: +p.remaining.toFixed(2),
       value: r2(p.tokens * p.remaining * px), pnlPct: +(px / p.entryPrice - 1).toFixed(4), openedAt: p.openedAt,
       entryMcap: r2(p.entryMcap), mcap: r2(mcNow), tp1Done: p.tp1Done, thesis: p.thesis, score: p.score,
-      note: p.plan?.note || "", fomoValue: p.fomoValue ?? null,
+      note: p.plan?.note || "", fomoValue: p.fomoValue ?? null, review: p.lastReview || null, calibratedAt: p.calibratedAt || 0,
+      partials: p.partials || [],
       plan: {
         sl: { pct: +(L.sl / p.entryPrice - 1).toFixed(3), mcap: mcAt(L.sl) },
         tp1: { pct: CFG.exits.tp1, mcap: mcAt(L.tp1), done: p.tp1Done },
@@ -45,8 +46,9 @@ export function publish(bank, brain, journal, prices, control = { mode: "on" }) 
     external: bank.external || [],
     lastSync: bank.lastSync || 0,
     orders: bank.orders,
-    journal: journal.slice(-30).reverse().map((t) => ({ symbol: t.symbol, address: t.address, size: t.size ?? t.sizeSol,
-      pnl: t.pnl ?? t.pnlSol, pnlPct: t.pnlPct, reason: t.reason, openedAt: t.openedAt, closedAt: t.closedAt, thesis: t.thesis })),
+    journal: journal.slice(-50).reverse().map((t) => ({ symbol: t.symbol, address: t.address, size: t.size ?? t.sizeSol,
+      pnl: t.pnl ?? t.pnlSol, pnlPct: t.pnlPct, reason: t.reason, openedAt: t.openedAt, closedAt: t.closedAt, thesis: t.thesis,
+      entryMcap: t.entryMcap || 0, exitMcap: t.exitMcap || 0, plan: t.plan || "", partials: t.partials || [] })),
     rules: {
       unit: "usd", reserve: CFG.bank.reserve, minPos: CFG.bank.minPos, maxPos: CFG.bank.maxPos, maxOpen: CFG.bank.maxOpen,
       dailyLoss: CFG.bank.dailyLossLimit, halt: CFG.bank.haltEquity, stop: CFG.exits.stopLoss, tp1: CFG.exits.tp1, tp2: CFG.exits.tp2,

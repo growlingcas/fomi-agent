@@ -36,6 +36,19 @@ export function normalizePair(p, boosted = false) {
   };
 }
 
+function fromGmgn(x) {
+  const g = x.gmgn;
+  return {
+    address: x.address, symbol: x.symbol, name: g.name || "", pairAddress: "", dex: "pump", priceNative: 0, priceUsd: g.priceUsd,
+    liqUsd: g.liqUsd || 0, fdv: g.mcap || 0, mcap: g.mcap || 0,
+    ageMin: g.created ? (Date.now() / 1000 - g.created) / 60 : 99999,
+    vol: { m5: 0, h1: g.vol1h || 0, h24: 0 }, chg: { m5: g.chg5m || 0, h1: g.chg1h || 0, h24: 0 },
+    txns: { m5: { b: 0, s: 0 }, h1: { b: g.buys || 0, s: g.sells || 0 } },
+    socials: { twitter: !!g.twitter, telegram: !!g.telegram, website: !!g.website }, links: { website: g.website, twitter: g.twitter, telegram: g.telegram },
+    boosted: false, url: `https://gmgn.ai/sol/token/${x.address}`, gmgn: g, origin: x.origin, source: "gmgn", description: "",
+  };
+}
+
 // Берём пары по адресам токенов (до 30 за запрос), оставляем самую ликвидную пару на токен.
 export async function pairsFor(addresses, boostedSet = new Set()) {
   const out = new Map();
@@ -61,7 +74,11 @@ export async function scan() {
       const g = await gmgn.trending();
       const byAddr = new Map(g.map((t) => [t.address, t]));
       const pairs = await pairsFor(g.map((t) => t.address));
-      if (pairs.length) return pairs.map((t) => ({ ...t, gmgn: byAddr.get(t.address)?.gmgn || null, origin: byAddr.get(t.address)?.origin || "", source: "gmgn" }));
+      const have = new Set(pairs.map((t) => t.address));
+      // свежие миграции DexScreener может ещё не знать — берём цифры из GMGN
+      const gmgnOnly = g.filter((x) => !have.has(x.address) && x.gmgn?.priceUsd).map((x) => fromGmgn(x));
+      const all = [...pairs.map((t) => ({ ...t, gmgn: byAddr.get(t.address)?.gmgn || null, origin: byAddr.get(t.address)?.origin || "", source: "gmgn" })), ...gmgnOnly];
+      if (all.length) return all;
     } catch (e) { console.log("gmgn scan failed, fallback to dexscreener:", e.message); }
   }
   const [profiles, boosts] = await Promise.all([

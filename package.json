@@ -27,7 +27,8 @@
     "phone:resize": "node brain/cli.js phone-resize",
     "phone:debug": "node brain/cli.js phone-debug",
     "admin": "node brain/cli.js admin",
-    "sync": "node brain/cli.js sync"
+    "sync": "node brain/cli.js sync",
+    "llm:test": "node brain/cli.js llm-test"
   },
   "optionalDependencies": {
     "sharp": "^0.33.0"
