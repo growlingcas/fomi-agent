@@ -633,7 +633,7 @@ async function typeInto(el, text, cps = 70) {
   if (reduced) { el.textContent = text; return; }
   for (let i = 0; i < text.length; i++) { el.textContent += text[i]; if (i % 2 === 0) await sleep(1000 / cps); }
 }
-const SOURCE_SIGNALS = { gmgn: ["momentum","volume","liquidity","freshness","smart"], "gmgn token": ["smart","safety"], dexscreener: ["momentum","volume","liquidity","freshness"], "mock screener": ["momentum","volume","liquidity","freshness"], x: ["social"], fomo: ["social","buyers"], chart: ["momentum","buyers","safety"] };
+const SOURCE_SIGNALS = { gmgn: ["momentum","volume","liquidity","freshness","smart"], "gmgn token": ["smart","safety"], project: ["social","safety"], dexscreener: ["momentum","volume","liquidity","freshness"], "mock screener": ["momentum","volume","liquidity","freshness"], x: ["social"], fomo: ["social","buyers"], chart: ["momentum","buyers","safety"] };
 
 function setTabs(sources, active) {
   $("tabs").innerHTML = sources.map((s) => `<span class="tab${s === active ? " on" : ""}" role="tab" aria-selected="${s === active}">${esc(s)}</span>`).join("") + `<span class="rec">rec</span>`;
@@ -717,10 +717,21 @@ async function act(ep, sources) {
   await sleep(800);
 }
 
+let lastScreener = null;
 async function playEpisode(ep) {
   const sources = ep.pages.map((p) => p.source);
+  if (ep.pages[0]?.source === "gmgn") lastScreener = ep.pages[0];
+  if (ep.scanOnly) {
+    setTabs(sources, sources[0]);
+    logLine("sys", `scan: ${ep.note || "nothing new"}`);
+    $("decision").textContent = "scanning"; $("decision").className = "decision";
+    await showPage(ep, ep.pages[0], sources);
+    $("caption").textContent = ep.note || "nothing new worth a look";
+    await sleep(2500);
+    return;
+  }
   setTabs(sources, sources[0]);
-  logLine("sys", `${ep.replay ? "replay" : "new"}: looking at $${ep.symbol}`);
+  logLine("sys", `looking at $${ep.symbol}`);
   $("decision").textContent = "reading"; $("decision").className = "decision";
   $("score").innerHTML = `··<small>/100</small>`;
   for (const p of ep.pages) await showPage(ep, p, sources);
@@ -729,18 +740,39 @@ async function playEpisode(ep) {
 }
 
 function nextEpisode() {
-  if (S.live && S.episodes.length) {
+  if (S.live) {
+    // только новые разборы — без повторов. Первым делом показываем самый свежий.
     const fresh = S.episodes.filter((e) => !S.played.has(e.id));
-    const ep = fresh.length ? fresh[0] : { ...pick(S.episodes.slice(-8)), replay: true };
-    S.played.add(ep.id);
-    return ep;
+    if (!S.played.size && fresh.length > 2) fresh.slice(0, -2).forEach((e) => S.played.add(e.id));
+    const ep = S.episodes.find((e) => !S.played.has(e.id));
+    if (ep) S.played.add(ep.id);
+    return ep || null;
   }
   return demoEpisode();
 }
 
+// пока нового разбора нет — она листает последний скринер
+async function idle() {
+  if (!lastScreener) { $("caption").textContent = "waiting for the next scan"; await sleep(3000); return; }
+  const rows = $("lines").children;
+  if ($("pageTitle").textContent !== lastScreener.title) {
+    setTabs(["gmgn"], "gmgn");
+    $("url").textContent = "https://" + lastScreener.url;
+    $("pageTitle").textContent = lastScreener.title;
+    $("lines").innerHTML = lastScreener.lines.map((l) => `<div class="ln"><span class="sweep"></span>${esc(l)}</div>`).join("");
+  }
+  const i = Math.floor(Math.random() * Math.max(1, rows.length));
+  if (rows[i]) { await cursorTo(rows[i]); rows[i].classList.add("seen"); }
+  $("caption").textContent = `skimming the trends · next scan soon`;
+  await sleep(2500);
+}
+
 async function director() {
   for (;;) {
-    try { await playEpisode(nextEpisode()); } catch (e) { console.error(e); await sleep(1500); }
+    try {
+      const ep = nextEpisode();
+      if (ep) await playEpisode(ep); else await idle();
+    } catch (e) { console.error(e); await sleep(1500); }
     if (!S.live) demoMarketStep();
   }
 }
@@ -1154,6 +1186,7 @@ async function connectLive() {
       else if (e.type === "learn") logLine("think", e.text);
       else if (e.type === "control") { S.control = { mode: e.mode, at: e.at }; logLine("sys", `admin: agent ${e.mode}`); renderPanels(); }
       else if (e.type === "stuck") logLine("money", e.text);
+      else if (e.type === "thesis") logLine("voice", e.text);
       else if (e.type === "error") logLine("money", `error: ${e.text}`);
       else if (e.type === "buy") logLine("money", `bought $${e.symbol} · ${money(e.size)}`);
       else if (e.type === "exit") logLine("money", `exit $${e.symbol} · ${e.reason} · ${pct(e.pnlPct || 0)}`);

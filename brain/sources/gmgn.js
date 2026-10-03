@@ -21,30 +21,59 @@ function cli(args) {
 
 const num = (v) => (v === undefined || v === null || v === "" ? null : Number(v));
 
-// Трендовые токены Solana за час, без wash trading
-export async function trending() {
-  const pump = CFG.filters.pumpFunOnly ? ["--platform", "Pump.fun", "--platform", "pump_mayhem", "--platform", "pump_agent", "--platform", "pump_mayhem_agent"] : [];
-  const j = await cli(["market", "trending", "--chain", "sol", "--interval", "1h", "--order-by", "volume",
-    "--limit", "60", "--filter", "not_wash_trading", ...pump]);
-  const list = j?.rank || j?.data?.rank || (Array.isArray(j) ? j : []);
-  return list.map((t) => ({
+const pick = (t, ...keys) => { for (const k of keys) if (t[k] !== undefined && t[k] !== null && t[k] !== "") return t[k]; return undefined; };
+
+// Приводим и тренды, и «trenches» к одному виду
+function norm(t, origin) {
+  return {
     address: t.address,
     symbol: (t.symbol || "?").toUpperCase(),
+    origin,
     gmgn: {
-      priceUsd: num(t.price), mcap: num(t.market_cap), liqUsd: num(t.liquidity), vol1h: num(t.volume),
-      chg1h: num(t.price_change_percent1h ?? t.price_change_percent), chg5m: num(t.price_change_percent5m),
-      buys: num(t.buys), sells: num(t.sells), holders: num(t.holder_count),
+      priceUsd: num(t.price), mcap: num(pick(t, "market_cap", "usd_market_cap")), liqUsd: num(t.liquidity),
+      vol1h: num(pick(t, "volume", "volume_1h")),
+      chg1h: num(pick(t, "price_change_percent1h", "price_change_percent")), chg5m: num(t.price_change_percent5m),
+      buys: num(pick(t, "buys", "buys_24h")), sells: num(pick(t, "sells", "sells_24h")), holders: num(t.holder_count),
       smart: num(t.smart_degen_count) || 0, kol: num(t.renowned_count) || 0,
       rug: num(t.rug_ratio), top10: num(t.top_10_holder_rate), wash: t.is_wash_trading === true || t.is_wash_trading === 1,
-      bundler: num(t.bundler_rate), snipers: num(t.sniper_count),
+      bundler: num(pick(t, "bundler_rate", "bundler_trader_amount_rate")), snipers: num(t.sniper_count),
       devHolds: t.creator_token_status === "creator_hold",
-      mintRenounced: num(t.renounced_mint) === 1, freezeRenounced: num(t.renounced_freeze_account) === 1,
-      platform: t.launchpad_platform || "", created: num(t.creation_timestamp),
-      twitter: t.twitter_username || "", website: t.website || "", telegram: t.telegram || "",
+      mintRenounced: num(t.renounced_mint) === 1 || t.renounced_mint === true,
+      freezeRenounced: num(t.renounced_freeze_account) === 1 || t.renounced_freeze_account === true,
+      platform: t.launchpad_platform || "", created: num(pick(t, "creation_timestamp", "created_timestamp")),
+      twitter: pick(t, "twitter_username", "twitter") || "", website: t.website || "", telegram: t.telegram || "",
+      xFollowers: num(t.x_user_follower),
       socialReuse: num(t.twitter_create_token_count) || 0, socialDeletes: num(t.twitter_del_post_token_count) || 0,
-      websiteDup: num(t.website_dup) || 0, twitterDup: num(t.twitter_dup) || 0, cto: num(t.cto_flag) === 1,
+      websiteDup: num(t.website_dup) || 0, twitterDup: num(t.twitter_dup) || 0, cto: num(t.cto_flag) === 1 || t.cto_flag === true,
       botRate: num(t.bot_degen_rate), entrapment: num(t.entrapment_ratio), live: t.is_token_live === true,
       name: t.name || "",
     },
-  })).filter((t) => t.address);
+  };
+}
+
+const PUMP_ARGS = () => (CFG.filters.pumpFunOnly ? ["--platform", "Pump.fun", "--platform", "pump_mayhem", "--platform", "pump_agent", "--platform", "pump_mayhem_agent"] : []);
+
+async function trendingList(interval) {
+  const j = await cli(["market", "trending", "--chain", "sol", "--interval", interval, "--order-by", "volume",
+    "--limit", "50", "--filter", "not_wash_trading", ...PUMP_ARGS()]);
+  return (j?.rank || j?.data?.rank || (Array.isArray(j) ? j : [])).map((t) => norm(t, `trending ${interval}`));
+}
+
+// Только что мигрировавшие с бондинг-кривой pump.fun токены
+async function migrated() {
+  const args = ["market", "trenches", "--chain", "sol", "--type", "completed", "--limit", "40",
+    "--min-marketcap", String(CFG.filters.minMcapUsd), "--max-rug-ratio", String(CFG.filters.maxRug), "--sort-by", "volume_1h"];
+  if (CFG.filters.pumpFunOnly) args.push("--launchpad-platform", "Pump.fun");
+  const j = await cli(args);
+  const list = j?.completed || j?.data?.completed || [];
+  return list.map((t) => norm(t, "just migrated"));
+}
+
+// Три потока: тренды за 1ч, тренды за 5м, свежие миграции. Дубликаты склеиваем.
+export async function trending() {
+  const parts = await Promise.allSettled([trendingList("1h"), trendingList("5m"), migrated()]);
+  const out = new Map();
+  for (const p of parts) if (p.status === "fulfilled") for (const t of p.value) if (t.address && !out.has(t.address)) out.set(t.address, t);
+  if (!out.size) throw new Error(parts.map((p) => p.reason?.message).filter(Boolean)[0] || "gmgn returned nothing");
+  return [...out.values()];
 }

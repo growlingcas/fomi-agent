@@ -59,9 +59,9 @@ export async function scan() {
   if (gmgn.enabled()) {
     try {
       const g = await gmgn.trending();
-      const byAddr = new Map(g.map((t) => [t.address, t.gmgn]));
+      const byAddr = new Map(g.map((t) => [t.address, t]));
       const pairs = await pairsFor(g.map((t) => t.address));
-      if (pairs.length) return pairs.map((t) => ({ ...t, gmgn: byAddr.get(t.address) || null, source: "gmgn" }));
+      if (pairs.length) return pairs.map((t) => ({ ...t, gmgn: byAddr.get(t.address)?.gmgn || null, origin: byAddr.get(t.address)?.origin || "", source: "gmgn" }));
     } catch (e) { console.log("gmgn scan failed, fallback to dexscreener:", e.message); }
   }
   const [profiles, boosts] = await Promise.all([

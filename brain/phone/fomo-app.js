@@ -48,7 +48,8 @@ async function verify({ ticker, amount, kind }) {
   const s = await screen();
   if (s.readable) {
     const ok = s.all.includes(String(ticker).toLowerCase()) && (!amount || s.all.includes(`$${amount}`));
-    return { ok, how: "ui" };
+    if (ok) return { ok, how: "ui" };
+    // Android отдал мало текста (часть экрана — картинка/график) — смотрим глазами
   }
   const jpg = await phone.screenshot().catch(() => null);
   if (!jpg) return { ok: false, how: "no screen" };
@@ -147,29 +148,59 @@ export async function buy({ address, symbol, usd, thesis }) {
     return { filled: false, dry: true };
   }
   await swipe(UI.slideBuy, `slide to buy $${amt}`);
-  await wait(6000);
+  await wait(6500);
+  // подтверждение: после покупки на странице токена должна появиться «Your position»
+  const after = await screen();
+  let confirmed = after.all.includes("your position");
+  if (!confirmed) {
+    const jpg = await phone.screenshot().catch(() => null);
+    const v = jpg && await look(jpg, `Expected: token page for ${symbol} that now shows a "Your position" block with a dollar value. Set ok=true only if that block is visible.`);
+    confirmed = !!v?.ok;
+  }
+  if (!confirmed) {
+    emit("phone-step", { label: `can't confirm the $${symbol} buy — check fomo` });
+    return { filled: false, unconfirmed: true };
+  }
 
   emit("phone-step", { label: `bought $${amt} of $${symbol}` });
-  let thesisPosted = false;
-  if (thesis) thesisPosted = await postThesis(symbol, thesis);
-  return { filled: true, thesisPosted };
+  const th = thesis ? await postThesis(symbol, thesis) : { ok: false, error: "no thesis" };
+  return { filled: true, thesisPosted: th.ok, thesisError: th.error };
 }
 
+// Тезис: страница токена → «Add thesis» → поле → текст → «Post». Каждый шаг проверяется,
+// при неудаче возвращаем причину — мозг попробует ещё раз на следующем тике.
 export async function postThesis(symbol, text) {
   try {
+    guard();
+    await wait(2500);                                    // после покупки блок позиции появляется не сразу
     await tapStep("addThesis", "add thesis");
-    await wait(1500);
-    await tapStep("thesisInput", "thesis field");
-    await phone.type(text.slice(0, 280));
-    await wait(1500);
-    await tapStep("postThesis", "post thesis");
     await wait(2500);
+    const ed = await screen();
+    if (!ed.all.includes("add a thesis") && !ed.all.includes("position")) {
+      const jpg = await phone.screenshot().catch(() => null);
+      const v = jpg && await look(jpg, `Expected: the "add a thesis" editor for ${symbol} with a text field and a Post button.`);
+      if (!v?.ok || v.screen !== "thesis") throw new Error("thesis editor did not open");
+    }
+    await tapStep("thesisInput", "thesis field", false);
+    await wait(800);
+    await phone.type(text.slice(0, 280));
+    await wait(2000);
+    await tapStep("postThesis", "post thesis");
+    await wait(3500);
+    const done = await screen();
+    let ok = done.all.includes("thesis added") || done.all.includes("update thesis") || done.all.includes(text.slice(0, 20).toLowerCase());
+    if (!ok) {
+      const jpg = await phone.screenshot().catch(() => null);
+      const v = jpg && await look(jpg, `Expected: token page for ${symbol} after posting a thesis — a "Thesis added" toast, an "Update thesis" link, or the thesis text under the position. ok=true only if one is visible.`);
+      ok = !!v?.ok;
+    }
+    if (!ok) throw new Error("thesis not visible after Post");
     emit("phone-step", { label: `thesis posted on $${symbol}` });
-    return true;
+    return { ok: true };
   } catch (e) {
-    emit("phone-step", { label: `thesis skipped: ${e.message}` });
+    emit("phone-step", { label: `thesis failed: ${e.message}` });
     await phone.back().catch(() => {});
-    return false;
+    return { ok: false, error: e.message };
   }
 }
 

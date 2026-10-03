@@ -13,6 +13,7 @@ import { decide } from "./llm.js";
 import { loadBank, saveBank, equity, gate, sizeFor, exitCheck, recordClose, priceOf, valueOf } from "./bank.js";
 import { loadJournal, saveJournal, stats, pushEvent, pushEpisode } from "./memory.js";
 import { getControl } from "./control.js";
+import { load, save } from "./store.js";
 import { post, entryTweet, exitTweet } from "./xposter.js";
 import { publish } from "./publish.js";
 
@@ -26,10 +27,22 @@ const pct = (x) => (x >= 0 ? "+" : "") + (x * 100).toFixed(0) + "%";
 
 // строки «как на экране скринера» — сайт показывает их в стриме
 const row = (t) => `${pad("$" + t.symbol, 10)} ${pad(age(t.ageMin), 5)} mc ${pad(k(t.mcap || t.fdv), 6)} liq ${pad(k(t.liqUsd), 6)} vol1h ${pad(k(t.vol.h1), 6)} ${pad(pct(t.chg.h1 / 100), 6)} b/s ${t.txns.h1.b}/${t.txns.h1.s}`;
-const gRow = (t) => { const g = t.gmgn || {};
-  return `${pad("$" + t.symbol, 10)} ${pad(age(t.ageMin), 5)} mc ${pad(k(t.mcap || t.fdv), 6)} liq ${pad(k(t.liqUsd), 6)} ${pad(pct(t.chg.h1 / 100), 6)} smart ${pad(g.smart ?? "-", 3)} kol ${pad(g.kol ?? "-", 3)} rug ${g.rug != null ? g.rug.toFixed(2) : "-"}`; };
+const tag = (o) => (o === "just migrated" ? "migr" : o === "trending 5m" ? "5m" : o === "trending 1h" ? "1h" : "");
+const gRow = (t, verdict = "") => { const g = t.gmgn || {};
+  return `${pad("$" + t.symbol, 10)} ${pad(tag(t.origin), 4)} ${pad(age(t.ageMin), 4)} mc ${pad(k(t.mcap || t.fdv), 6)} ${pad(pct(t.chg.h1 / 100), 6)} smart ${pad(g.smart ?? "-", 3)} rug ${pad(g.rug != null ? g.rug.toFixed(2) : "-", 4)} ${verdict}`; };
 
 async function manageOpen(bank, journal, prices) {
+  // тезисы, которые не встали при покупке: до 3 попыток, по одной за тик
+  if (exec.retryThesis) for (const pos of bank.positions) {
+    if (pos.thesis && !pos.thesisPosted && (pos.thesisTries || 0) < 3) {
+      pos.thesisTries = (pos.thesisTries || 0) + 1;
+      const r = await exec.retryThesis(pos).catch((e) => ({ ok: false, error: e.message }));
+      pos.thesisPosted = !!r.ok;
+      pushEvent(r.ok ? { type: "thesis", symbol: pos.symbol, text: `thesis posted on $${pos.symbol}` }
+        : { type: "error", text: `thesis for $${pos.symbol} failed (try ${pos.thesisTries}/3): ${r.error}` });
+      break;
+    }
+  }
   for (const pos of [...bank.positions]) {
     const t = prices.get(pos.address);
     if (!t) continue;
@@ -75,18 +88,38 @@ async function hunt(bank, journal, brain, prices, paused) {
   log(`scanned ${scanned.length} tokens`);
 
   const held = new Set(bank.positions.map((p) => p.address));
+  const seen = load("seen", {});
+  const cooldown = (Number(process.env.RESEARCH_COOLDOWN_MIN) || 20) * 60e3;
+  const fresh = (t) => !seen[t.address] || Date.now() - seen[t.address] > cooldown;
   const ranked = scanned
     .filter((t) => !held.has(t.address))
     .map((t) => ({ t, why: passesFilters(t) }))
     .map((x) => ({ ...x, pre: x.why ? 0 : score(computeSignals(x.t), brain.weights) }))
     .sort((a, b) => b.pre - a.pre);
+  const picks = ranked.filter((x) => !x.why && fresh(x.t)).slice(0, 3);
+
+  // экран скринера: что она видит в трендах и почему отсеивает — разные токены каждый скан
+  const byVol = (a, b) => (b.t.vol?.h1 || 0) - (a.t.vol?.h1 || 0);
+  const shown = [...picks, ...ranked.filter((x) => !picks.includes(x)).sort(byVol).slice(0, 14 - picks.length)].sort(byVol);
+  const verdict = (x) => (picks.includes(x) ? "→ look" : x.why ? "✗ " + x.why : fresh(x.t) ? "✓" : "· seen");
+  const screenPage = (focus) => ({
+    source: "gmgn", url: "gmgn.ai/trend?chain=sol", title: `pump.fun · trending 1h + 5m + just migrated · ${scanned.length} tokens`,
+    lines: shown.map((x) => gRow(x.t, verdict(x))), focus,
+  });
+  if (!picks.length) {
+    pushEpisode({ scanOnly: true, symbol: "", pages: [screenPage([0, 1, 2].filter((i) => i < shown.length))],
+      note: ranked.some((x) => !x.why) ? "nothing new since last look" : "nothing passes the filters" });
+    log("no fresh candidates this scan");
+  }
 
   const screen = ranked.slice(0, 12).map((x) => x.t);
   const st = stats(journal);
   let entered = 0;
 
-  for (const { t, why } of ranked.slice(0, 4)) {
-    if (why) break;
+  for (const { t, why } of picks) {
+    seen[t.address] = Date.now();
+    save("seen", Object.fromEntries(Object.entries(seen).filter(([, ts]) => Date.now() - ts < 24 * 3600e3)));
+
     const [xs, fs, rs] = await Promise.all([mentions(t.symbol), feed(t.symbol), research(t)]);
     const sig = computeSignals(t, { x: xs, fomo: fs });
     const sc = score(sig, brain.weights);
@@ -113,9 +146,9 @@ async function hunt(bank, journal, brain, prices, paused) {
     pushEpisode({
       symbol: t.symbol, url: t.url, address: t.address,
       pages: [
-        t.source === "gmgn"
-          ? { source: "gmgn", url: "gmgn.ai/trend?chain=sol", title: "trending · solana · 1h", lines: screen.map(gRow), focus: [screen.indexOf(t)] }
-          : { source: CFG.mock ? "mock screener" : "dexscreener", url: CFG.mock ? "mock://new-pairs" : "dexscreener.com/solana", lines: screen.map(row), focus: [screen.indexOf(t)] },
+        t.source === "gmgn" || CFG.mock
+          ? screenPage([shown.findIndex((x) => x.t === t)])
+          : { source: "dexscreener", url: "dexscreener.com/solana", lines: screen.map(row), focus: [screen.indexOf(t)] },
         ...(t.gmgn ? [{ source: "gmgn token", url: `gmgn.ai/sol/token/${t.address}`, title: `$${t.symbol} · holders & risk`, lines: [
           `holders ${t.gmgn.holders ?? "-"}   top10 ${t.gmgn.top10 != null ? (t.gmgn.top10 * 100).toFixed(0) + "%" : "-"}`,
           `smart money ${t.gmgn.smart}   kol ${t.gmgn.kol}   snipers ${t.gmgn.snipers ?? "-"}`,
@@ -145,7 +178,9 @@ async function hunt(bank, journal, brain, prices, paused) {
       catch (e) { pushEvent({ type: "error", text: `buy $${t.symbol} failed: ${e.message}` }); log("buy failed", e.message); continue; }
       bank.lastEntry[t.address] = Date.now();
       if (res.filled || res.order) { bank.entryTimes.push(Date.now()); entered++; }
-      pushEvent({ type: res.dry ? "dry-run" : res.filled ? "buy" : "order", symbol: t.symbol, size, thesis: d.thesis });
+      if (res.thesisError) pushEvent({ type: "error", text: `thesis for $${t.symbol} failed: ${res.thesisError} — will retry` });
+      if (res.unconfirmed) pushEvent({ type: "error", text: `buy $${t.symbol} $${size} sent but not confirmed on screen — check fomo` });
+      pushEvent({ type: res.dry ? "dry-run" : res.filled ? "buy" : res.unconfirmed ? "unconfirmed" : "order", symbol: t.symbol, size, thesis: d.thesis });
       if (res.filled) post(entryTweet(t, size, d.thesis));
     }
   }
